@@ -1,0 +1,3 @@
+_target_: src.training.loss.GaussianKL
+beta: 1.0
+beta_schedule: null

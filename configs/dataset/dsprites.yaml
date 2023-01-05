@@ -1,0 +1,6 @@
+defaults:
+  - base
+  - _self_
+
+dataset_name: dsprites
+path: data/datasets/dsprites/dsprite_train.npz

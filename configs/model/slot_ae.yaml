@@ -1,0 +1,48 @@
+defaults:
+  - /loss: recons_mse
+  - /optimizer: adam
+  - /scheduler: warmup
+  - _self_
+
+_target_: src.model.slotae.SlotAutoEncoder
+
+slot:
+  _target_: src.layers.slot.SlotAttention
+  input_size: 64
+  n_slots: 4
+  slot_size: 64
+  slot_channels: 1
+  n_iter: 3
+  hidden_size: 64
+  approx_implicit_grad: True
+
+encoder:
+  _target_: bin.init.parsing.create_sequential
+  input_size: [3, 64, 64]
+  layer_defs:
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 1, 1, 0]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [permute, [0, 2, 3, 1]]
+    - [posemb2d, {embed: cardinal}]
+    - [flatten, [1, 2]]
+    - [layer_norm, [-1]]
+    - [linear, ["${model.slot.input_size}"]]
+    - [relu]
+
+decoder:
+  _target_: bin.init.parsing.create_sequential
+  constructor: "${get_cls: src.layers.slot.SlotDecoder}"
+  input_size: ${model.slot.slot_size}
+  layer_defs:
+    - [spatbroad, [16, 16], {input_last: True}]
+    - [posemb2d, {embed: cardinal}]
+    - [permute, [0, 3, 1, 2]]
+    - [tconv, [64, 4, 2, 1]]
+    - [relu]
+    - [tconv, [64, 1, 1, 0]]
+    - [relu]
+    - [tconv, ["${sum:${model.encoder.input_size.0},1}", 4, 2, 1]]

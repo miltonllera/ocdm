@@ -1,0 +1,5 @@
+_target_: src.training.scheduler.ExponentialLR
+_partial_: True
+
+gamma: 0.9
+decay_groups: null

@@ -1,0 +1,11 @@
+_target_: src.dataset.comptask.CompositionTaskDataModule
+
+dataset_name: null
+path: null
+
+split_condition: null
+split_variant: null
+split_modifiers: null
+
+batch_size: 64
+transform: null

@@ -1,0 +1,8 @@
+defaults:
+  - base_lgm
+  - /loss@recons_loss: recons_mse
+  - /loss@latent_loss: wasserstein_mmd
+  - /optimizer: adam
+  - _self_
+
+_target_: src.model.autoencoder.VariationalAutoEncoder

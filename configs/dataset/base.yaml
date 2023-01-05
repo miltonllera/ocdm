@@ -1,0 +1,13 @@
+_target_: src.dataset.iid.IIDDataModule
+
+dataset_name: null
+path: null
+
+setting: unsupervised
+
+split_condition: null
+split_variant: null
+split_modifiers: null
+
+batch_size: 64
+transform: null

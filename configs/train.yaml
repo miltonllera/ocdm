@@ -1,0 +1,26 @@
+# @package _global_
+
+defaults:
+  - _self_  # override defaults
+  - dataset: null
+  - model: null
+  - callbacks: dafault
+  - logger: tensorboard
+  - trainer: dafault
+  - paths: default
+  - hydra: default
+
+  # Set an experiment with all the above set to specific values
+  - experiment: null
+
+  # Hyperparemeter optimization
+  - hparams_search: null
+
+
+task_name: train
+
+tags: ["dev"]
+
+seed: null
+
+ckpt_path: null  # path to resume training

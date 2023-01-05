@@ -1,0 +1,11 @@
+defaults:
+  - dsprites
+
+setting: supervised
+
+_getter_params:
+  target_transform:
+    _target_: src.dataset.transforms.RescaleTargets
+    mean: [2.0, 0.75, 3.1415926535, 0.5, 0.5207373271428571]
+    min: [1.0, 0.5, 0.0, 0.0, 0.0]
+    max: [3.0, 1.0, 6.28318531, 1.0, 1.0]

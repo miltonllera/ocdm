@@ -1,0 +1,10 @@
+defaults:
+  - base
+  - _self_
+
+dataset_name: mpi3d
+path: data/datasets/mpi3d/
+
+_dataset_params:
+  color_format: rgb
+  version: real

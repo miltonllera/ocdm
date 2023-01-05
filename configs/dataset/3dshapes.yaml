@@ -1,0 +1,9 @@
+defaults:
+  - base
+  - _self_
+
+dataset_name: 3dshapes
+path: data/datasets/shapes3d/3dshapes.h5
+
+_dataset_params:
+  color_format: rgb

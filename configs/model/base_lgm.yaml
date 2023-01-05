@@ -1,0 +1,35 @@
+latent:
+  _target_: src.layers.stochastic.DiagonalGaussian
+  input_size: 256
+  latent_size: 10
+
+encoder:
+  _target_: bin.init.parsing.create_sequential
+  input_size: [1, 64, 64]
+  layer_defs:
+    - [conv, [32, 4, 2, 1]]
+    - [relu]
+    - [conv, [32, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [flatten, [1]]
+    - [linear, ["${model.latent.input_size}"]]
+    - [relu]
+
+decoder:
+  _target_: bin.init.parsing.create_sequential
+  input_size: ${model.latent.latent_size}
+  layer_defs:
+    - [linear, [256]]
+    - [relu]
+    - [unflatten, [1, [16, 4, 4]]]
+    - [tconv, [64, 4, 2, 1]]
+    - [relu]
+    - [tconv, [32, 4, 2, 1]]
+    - [relu]
+    - [tconv, [32, 4, 2, 1]]
+    - [relu]
+    - [tconv, ["${model.encoder.input_size.0}", 4, 2, 1]]

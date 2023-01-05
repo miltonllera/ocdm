@@ -1,0 +1,46 @@
+# @package _global_
+
+defaults:
+  - override /dataset: composition_dsprites
+  - override /model: compnet
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+task_name: composition_dsprites
+
+tags: ["dsprites", "composition", "compnet", "shape2tx"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 64
+  rebalance_wrt_factor: shape
+  split_condition: combgen
+  split_variant: sqr2tx
+
+model:
+  composition_op:
+    _target_: src.layers.composition.FixedInterpolationComp
+    n_actions: 5
+  optimizer:
+    lr: 0.001
+    weight_decay: 0.0
+
+trainer:
+  min_epochs: 1
+  max_epochs: 30
+  gradient_clip_val: 1.0
+
+  # DataLoader does not provide a way to control this, so we must use this hack
+  limit_val_batches: 1000
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

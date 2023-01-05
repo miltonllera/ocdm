@@ -1,0 +1,14 @@
+defaults:
+  - model_checkpoint
+  - rich_progress_bar
+  - lr_monitor
+  - _self_
+
+model_checkpoint:
+  dirpath: ${paths.output_dir}/checkpoints
+  filename: "epoch_{epoch:03d}"
+  monitor: null
+  mode: null  # use null to force setting a value
+  save_last: True
+  auto_insert_metric_name: False
+  save_weights_only: True

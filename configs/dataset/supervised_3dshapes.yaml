@@ -1,0 +1,12 @@
+defaults:
+  - 3dshapes
+  - _self_
+
+setting: supervised
+
+_getter_params:
+  target_transform:
+    _target_: src.dataset.transforms.RescaleTargets
+    min: [0.0, 0.0, 0.0, 0.75, 0, -30.0]
+    max: [0.9, 0.9, 0.9, 1.25, 3, 30.0]
+    mean: [0.45, 0.45, 0.45, 1.0, 1.5, 0.0]

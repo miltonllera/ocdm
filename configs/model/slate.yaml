@@ -1,0 +1,125 @@
+defaults:
+  - /loss: recons_mse
+  - /optimizer: adam
+  - /scheduler: exponential_lr
+  - _self_
+
+_target_: src.model.slate.SLATE
+
+resolution: [16, 16]
+
+vocab_size: 256
+
+dim: 192
+
+latent:
+  _target_: src.layers.stochastic.GumbelSoftmax
+  input_size: 64
+  n_cat: ${model.vocab_size}
+  tau: 0.1
+  tau_start: 1.0
+  tau_steps: 30000
+
+slot:
+  _target_: src.layers.slot.SlotAttention
+  input_size: ${model.dim}
+  n_slots: 4
+  slot_size: ${model.dim}
+  slot_channels: 1
+  n_iter: 3
+  hidden_size: 192
+  approx_implicit_grad: True
+
+transformer_decoder:
+  _target_: src.layers.transformer.TransformerDecoder
+  max_seqlen: "${prod:${model.resolution.0},${model.resolution.1}}"
+  d_model: ${model.dim}
+  n_head: 4
+  num_layers: 4
+  ffwd_dim: null
+  dropout: 0.1
+
+patch_encoder:
+  _target_: bin.init.parsing.create_sequential
+  input_size: [3, 64, 64]
+  layer_defs:
+    - [conv, [64, 4, 4, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, ["${model.latent.input_size}", 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [permute, [0, 2, 3, 1]]
+
+patch_decoder:
+  _target_: bin.init.parsing.create_sequential
+  input_size: ["${model.resolution.0}", "${model.resolution.1}", "${model.vocab_size}"]
+  layer_defs:
+    - [permute, [0, 3, 1, 2]]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 3, 1, 1], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [256, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [pixel_shuffle, [2], {bias: False}]
+
+    - [conv, [64, 3, 1, 1], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [256, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [pixel_shuffle, [2]]
+    - [conv, ["${model.patch_encoder.input_size.0}", 1, 1, 0]]
+
+
+# Autoregressive reconstruction is super slow.
+_ar_val_batches: 1
