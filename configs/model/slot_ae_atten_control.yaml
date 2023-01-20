@@ -1,0 +1,58 @@
+defaults:
+  - /loss: recons_mse
+  - /training: default
+  - /training@training.schedulers.exponential: exponential
+  - /training@training.schedulers.warmup: warmup
+  - _self_
+
+_target_: src.model.slotae_controls.SlotAttentionControl
+
+n_slots: 4
+slot_size: 64
+
+latent:
+  _target_: src.layers.stochastic.DiagonalGaussian
+  input_size: "${prod: ${model.slot_size}, ${model.n_slots}}"
+  latent_size: 256
+
+encoder:
+  _target_: bin.init.parsing.create_sequential
+  input_size: [3, 64, 64]
+  layer_defs:
+    - [conv, [32, 4, 2, 1]]
+    - [relu]
+    - [conv, [32, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [flatten, [1]]
+    - [linear, ["${model.latent.input_size}"]]
+    - [relu]
+
+decoder:
+  _target_: bin.init.parsing.create_sequential
+  constructor: "${get_cls: src.layers.slot.SlotDecoder}"
+  input_size: ${model.slot_size}
+  layer_defs:
+    - [spatbroad, [8, 8], {input_last: True}]
+    - [posemb2d, {embed: cardinal}]
+    - [permute, [0, 3, 1, 2]]
+    - [tconv, [64, 4, 2, 1]]
+    - [relu]
+    - [tconv, [64, 4, 2, 1]]
+    - [relu]
+    - [tconv, ["${sum:${model.encoder.input_size.0},1}", 4, 2, 1]]
+
+training:
+  optimizer:
+    lr: 0.0004
+
+  schedulers:
+    exponential:
+      gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
+    warmup:
+      warmup_steps: 30000
+
+  scheduling_metric: "val/loss"

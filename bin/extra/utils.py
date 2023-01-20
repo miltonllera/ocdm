@@ -1,6 +1,65 @@
 from abc import ABC, abstractmethod
 from typing import Any, List, Tuple, Union
+
+import numpy as np
+import torch
+from numpy.random.mtrand import choice
 from torch import Tensor, cat
+
+
+def collate(inputs):
+    return torch.from_numpy(np.stack(inputs))
+
+
+def random_sample(loader, n_samples):
+    idx = np.random.choice(len(loader.dataset), size=n_samples, replace=False)
+    data_points = [loader.dataset[i] for i in idx]
+    data_points = tuple(map(collate, zip(*data_points)))
+    return data_points
+
+
+def grid_sample(loader, n_samples):
+    step = len(loader.dataset) // n_samples
+    idx = range(0, len(loader.dataset), step)
+    data_points = [loader.dataset[i] for i in idx]
+    data_points = tuple(map(collate, zip(*data_points)))
+    return data_points
+
+
+def subsample(*arrays, n_samples=10000):
+    idx = choice(len(arrays[0]), size=n_samples)
+    subsampled = [a[idx] for a in arrays]
+    return subsampled
+
+
+@torch.no_grad()
+def compute_embeddings(model, loader):
+    embeddings = []
+    targets = []
+
+    for x, y in loader:
+        x = x.to(device=model.device)
+        e = model.embed(x)
+
+        embeddings.append(e)
+        targets.append(y)
+
+    return torch.cat(embeddings), torch.cat(targets)
+
+
+@torch.no_grad()
+def compute_outputs(model, loader):
+    reconstructions = []
+    targets = []
+
+    for x, y in loader:
+        x = x.to(device=model.device)
+        e = model(x)
+
+        reconstructions.append(e)
+        targets.append(y)
+
+    return torch.cat(reconstructions), torch.cat(targets)
 
 
 class OutputSelector(ABC):

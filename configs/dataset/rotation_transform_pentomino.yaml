@@ -1,0 +1,6 @@
+defaults:
+  - base
+  - _self_
+
+dataset_cls: "${get_cls: src.dataset.pentominos.FixedRotationPentominos}"
+path: "data/datasets/pentominos/dsprites-like"

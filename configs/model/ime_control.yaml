@@ -1,0 +1,29 @@
+# Independent Mechanism Encoder with no shared backbone
+# Tests whether the absence of shared backbone improves performance.
+
+defaults:
+  - ime
+  - _self_
+
+_target_: src.model.ime.IndependentMechanismEncoder
+
+hidden_size: 1024
+
+mechanism_encoder:
+  _target_: bin.init.parsing.create_sequential
+  input_size: [1, 64, 64]
+  layer_defs:
+    - [flatten, [1]]
+    - [linear, [2048]]
+    - [tanh]
+    - [linear, [2048]]
+    - [tanh]
+    - [linear, [2048]]
+    - [tanh]
+    - [linear, [2048]]
+    - [tanh]
+    - [linear, ["${model.hidden_size}"]]
+    - [tanh]
+
+encoder_backbone:
+  _target_: torch.nn.Identity

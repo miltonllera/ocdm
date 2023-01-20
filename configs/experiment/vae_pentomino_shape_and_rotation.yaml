@@ -1,0 +1,37 @@
+# @package _global_
+
+defaults:
+  - override /dataset: pentominos
+  - override /model: vae
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "pentominos", "vae", "shape_and_rotation"]
+
+seed: null
+
+test: True
+
+dataset:
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: shape_and_rotation
+  split_modifiers: [remove_redundant_rotations]
+  rebalance_wrt_factor: shape
+
+model:
+  encoder:
+    input_size: [1, 64, 64]
+
+trainer:
+  max_epochs: 60
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

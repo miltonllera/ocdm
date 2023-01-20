@@ -1,0 +1,44 @@
+# @package _global_
+
+defaults:
+  - override /dataset: supervised_dsprites  # override avoids conflicts with default config
+  - override /model: ime_no_backbone
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+task_name: supervised_dsprites
+
+tags: ["dsprites", "ime_control", "combgen", "heart_and_rotation"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 64
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: heart2rot
+  split_modifiers: [remove_redundant_rotations]
+  rebalance_wrt_factor: shape
+
+model:
+  n_mechanisms: 5
+  n_targets: [1, 1, 1, 1, 1]
+  target_type: [reg, reg, reg, reg, reg]
+  mechanism_names: [shape, scale, rot, posX, posY]
+
+  optimizer:
+    lr: 0.001
+    weight_decay: 0.0
+
+trainer:
+  min_epochs: 1
+  max_epochs: 10
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

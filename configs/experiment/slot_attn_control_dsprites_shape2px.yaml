@@ -1,0 +1,39 @@
+# @package _global_
+
+defaults:
+  - override /dataset: dsprites
+  - override /model: slot_ae_atten_control
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "dsprites", "slot_attn_control", "square_to_posX"]
+
+seed: null
+
+test: True
+
+dataset:
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: sqr2tx
+  split_modifiers: [remove_redundant_rotations]
+
+model:
+  n_slots: 2
+  latent:
+    latent_size: 128
+  encoder:
+    input_size: [1, 64, 64]
+
+trainer:
+  max_epochs: 50
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

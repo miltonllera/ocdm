@@ -1,0 +1,11 @@
+_target_: src.dataset.clevr.CLEVRDataModule
+
+dataset_name: clevr6
+
+root: data/datasets/clevr/
+
+setting: unsupervised
+
+condition: ood
+
+batch_size: 64

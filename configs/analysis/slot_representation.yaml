@@ -1,0 +1,24 @@
+# @package _global_
+
+defaults:
+  - base
+
+metrics: null
+
+visualizations:
+  slot_latent_rep:
+    _target_: bin.extra.visualization.SlotRepresentation
+    name: "tsne-df=0.5.png"
+    subsample: 100000
+    simultaneous_projection: True
+    dimensionality_reduction:
+      _target_: src.analysis.tsne.FItSNE
+      no_dims : 2
+      perplexity_list: [30.0, 250.0]
+      fft_not_bh: True
+      df: 0.5
+      max_iter: 1000
+      early_exag_coeff: 2500
+      stop_early_exag_iter: 500
+      start_late_exag_iter: 501
+      late_exag_coeff: 2500

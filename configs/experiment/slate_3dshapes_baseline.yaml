@@ -8,12 +8,10 @@ defaults:
   # - override /scheduler@model.scheduler: reduce_on_plateau
   - _self_
 
-# all parameters below will be merged with parameters from configurations in
-# the defaults list this allows you to overwrite only specific parameters.
-
-task_name: unsupervised_3dshapes
-
-tags: ["3dshapes", "slate", "baseline"]
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "3dshapes", "slate", "baseline"]
 
 seed: null
 

@@ -9,7 +9,8 @@ from src.training.loss import ReconstructionLoss
 
 
 class SlotAutoEncoder(BaseModel):
-    def __init__(self,
+    def __init__(
+        self,
         encoder: nn.Sequential,
         decoder: SlotDecoder,
         slot: SlotAttention,
@@ -51,3 +52,7 @@ class SlotAutoEncoder(BaseModel):
         )
 
         return loss
+
+    def embed(self, inputs):
+        h = self.encoder(inputs)
+        return self.slot_atten(h)[0]

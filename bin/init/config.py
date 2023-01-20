@@ -10,7 +10,7 @@ import pytorch_lightning as pl
 from hydra.utils import get_class, get_method
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.callbacks import Callback
-from pytorch_lightning.loggers import LightningLoggerBase
+from pytorch_lightning.loggers import Logger
 
 from bin.extra.analysis import Analysis
 from bin.extra.visualization import Visualzation
@@ -53,7 +53,7 @@ def instantiate_run(cfg) -> INSTANTIATED_RUN_MODULES:
 def instantiate_datamodule(dataset_cfg) -> pl.LightningDataModule:
     _log.info(
         f"Initializing datamodule <{dataset_cfg._target_}> with "
-        f"dataset <{dataset_cfg.dataset_name}>..."
+        f"dataset <{dataset_cfg.dataset_cls}>..."
     )
     datamodule: pl.LightningDataModule = instantiate(dataset_cfg)
     return datamodule
@@ -84,7 +84,7 @@ def instantiate_callbacks(callbacks_cfg: DictConfig) -> List[Callback]:
     return callbacks
 
 
-def instantiate_loggers(logger_cfg: DictConfig) -> List[LightningLoggerBase]:
+def instantiate_loggers(logger_cfg: DictConfig) -> List[Logger]:
     """Instantiates loggers from config."""
     logger: List[LightningLoggerBase] = []
 
@@ -106,7 +106,7 @@ def instantiate_loggers(logger_cfg: DictConfig) -> List[LightningLoggerBase]:
 def instantiate_trainer(
     trainer_cfg: DictConfig,
     callbacks: List[Callback],
-    logger: List[LightningLoggerBase],
+    logger: List[Logger],
 ) -> pl.Trainer:
     _log.info(f"Initializing trainer <{trainer_cfg._target_}>...")
 
@@ -153,6 +153,10 @@ def load_run(run_path: str) -> INSTANTIATED_RUN_MODULES:
     model.load_state_dict(load_best_model(run_path))
 
     return datamodule, model, trainer
+
+
+def load_model(run_path: str) -> pl.LightningModule:
+    return load_run(run_path)[1]
 
 
 def instantiate_metrics(

@@ -1,0 +1,43 @@
+defaults:
+  - slate
+  - _self_
+
+slot:
+  slot_size: 128
+
+encoder:
+  layer_defs:
+    - [conv, [64, 5, 2, 2]]
+    - [relu]
+    - [conv, [64, 5, 1, 2]]
+    - [relu]
+    - [conv, [64, 5, 1, 2]]
+    - [relu]
+    - [conv, [64, 5, 1, 2]]
+    - [relu]
+    - [permute, [0, 2, 3, 1]]
+    - [posemb2d, {embed: cardinal}]
+    - [flatten, [1, 2]]
+    - [layer_norm, [-1]]
+    - [linear, [128]]
+    - [relu]
+    - [linear, [128]]
+    - [relu]
+    - [linear, ["${model.slot.input_size}"]]
+
+decoder:
+  layer_defs:
+    - [spatbroad, [8, 8], {input_last: True}]
+    - [posemb2d, {embed: cardinal}]
+    - [permute, [0, 3, 1, 2]]
+    - [tconv, [64, 5, 2, 2]]
+    - [relu]
+    - [tconv, [64, 5, 2, 1]]
+    - [relu]
+    - [tconv, [64, 5, 2, 1]]
+    - [relu]
+    - [tconv, [64, 5, 2, 1]]
+    - [relu]
+    - [tconv, [64, 5, 1, 1]]
+    - [relu]
+    - [tconv, ["${sum:${model.encoder.input_size.0},1}", 4, 1, 2]]

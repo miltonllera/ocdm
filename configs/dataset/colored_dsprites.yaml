@@ -1,0 +1,6 @@
+defaults:
+  - base
+  - _self_
+
+dataset_name: colored_dsprites
+path: data/datasets/dsprites/colored_dsprites_train.hdf5

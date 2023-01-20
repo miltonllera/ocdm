@@ -1,0 +1,41 @@
+# @package _global_
+
+defaults:
+  - override /dataset: dsprites  # override avoids conflicts with default config
+  - override /model: sbd
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "dsprites", "wae_sbd", "heart_to_rot"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 64
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: heart2rot
+  split_modifiers: [remove_redundant_rotations]
+
+model:
+  training:
+    optimizer:
+      lr: 0.0001
+      weight_decay: 0.0
+
+trainer:
+  min_epochs: 1
+  max_epochs: 30
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"
+

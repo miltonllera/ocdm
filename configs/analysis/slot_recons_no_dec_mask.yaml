@@ -1,0 +1,16 @@
+# @package _global_
+
+defaults:
+  - slot_recons
+
+metrics:
+  recons_mse:
+    output_transform:
+      pred_transform:
+        idx: 0
+
+visualizations:
+  slot_reconstruction:
+    recons_extractor:
+      idx: 0
+    decoder_mask_extractor: null

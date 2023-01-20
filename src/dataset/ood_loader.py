@@ -1,11 +1,11 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 from functools import partial
-from . import dsprites, shapes3d, mpi
+from torch.utils.data import Dataset
 
 
 class OODLoader:
     def __init__(self,
-        dataset_name: str,
+        dataset_cls: Type[Dataset],
         data_path: str,
         condition: Optional[str] = None,
         variant: Optional[str] = None,
@@ -17,7 +17,7 @@ class OODLoader:
         if dataset_params is None:
             dataset_params = {}
 
-        self.dataset_name = dataset_name
+        self.dataset_cls = dataset_cls
         self.data_path = data_path
         self.condition = condition
         self.variant = variant
@@ -30,36 +30,23 @@ class OODLoader:
     def load_dataset(self, stage):
         if stage == "fit":
             split_fn = self.split_train
-        else:
+        elif stage in ["test", "predict"]:
             split_fn = self.split_test
+        elif stage == "all":
+            split_fn = None
+        else:
+            raise ValueError(f"Not recognized stage {stage}")
 
-        dataset_cls = self.get_dataset()
-        raw = dataset_cls.load_raw(self.data_path, split_fn)
-        return dataset_cls(
-            *raw,
+        return self.dataset_cls(
+            self.data_path,
+            split_fn,
             **self.dataset_params,
         )
 
-    def get_dataset(self):
-        name = self.dataset_name
-        if name == "dsprites":
-            return dsprites.DSprites
-        elif name == "3dshapes":
-            return shapes3d.Shapes3D
-        elif name == "mpi3d":
-            return mpi.MPI3D
-        else:
-            raise ValueError(f"Unrecognized dataset {name}")
-
     def get_splits(self):
-        if self.dataset_name == "dsprites":
-            all_splits, all_mods = dsprites.splits, dsprites.modifiers
-        elif self.dataset_name == "3dshapes":
-            all_splits, all_mods = shapes3d.splits, shapes3d.modifiers
-        elif self.dataset_name == "mpi3d":
-            all_splits, all_mods = mpi.splits, mpi.modifiers
-        else:
-            raise ValueError(f"Unrecognized dataset {self.dataset_name}")
+        dataset_cls = self.dataset_cls
+        all_splits = dataset_cls.get_splits()
+        all_mods = dataset_cls.get_modifiers()
 
         try:
             if self.condition is None:

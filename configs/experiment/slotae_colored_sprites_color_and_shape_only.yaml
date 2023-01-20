@@ -1,0 +1,45 @@
+# @package _global_
+
+defaults:
+  - override /dataset: colored_dsprites
+  - override /model: slot_ae
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "colored_sprites", "slot_ae", "heart_and_color"]
+
+seed: null
+
+test: True
+
+dataset:
+  split_data: False
+  split_condition: combgen
+  split_variant: shape_and_color_only
+  batch_size: 4
+
+model:
+  slot:
+    _target_: src.layers.slot.LateralSlotAttention
+    n_slots: 2
+    slot_size: 16
+    approx_implicit_grad: False
+  encoder:
+    input_size: [3, 64, 64]
+
+  training:
+    optimizer:
+      lr: 0.001
+
+trainer:
+  max_epochs: 500
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

@@ -7,7 +7,6 @@ defaults:
 
 # output directory, generated dynamically on each run
 run:
-  dir: ${paths.log_dir}/${task_name}/runs/${now:%Y-%m-%d}_${now:%H-%M}
+  dir: ${paths.log_dir}/${tags.0}/${tags.1}/${tags.2}/${tags.3}/${now:%Y-%m-%d}_${now:%H-%M}
 sweep:
-  dir: ${paths.log_dir}/${task_name}/multiruns/${now:%Y-%m-%d}_${now:%H-%M}
-  subdir: ${hydra.job.num}
+  dir: ${paths.log_dir}/multiruns/${tags.0}/${tags.1}/${tags.2}/${tags.3}/${now:%Y-%m-%d}_${now:%H-%M}

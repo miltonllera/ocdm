@@ -10,9 +10,8 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-task_name: composition_dsprites
-
-tags: ["dsprites", "composition", "compnet", "baseline"]
+# tags format is 'training_regime', 'dataset', 'model', 'condition'
+tags: ["composition", "dsprites", "compnet", "baseline"]
 
 seed: null
 

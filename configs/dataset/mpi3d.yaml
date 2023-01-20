@@ -2,7 +2,7 @@ defaults:
   - base
   - _self_
 
-dataset_name: mpi3d
+dataset_cls: "${get_cls: src.dataset.mpi.MPI3D}"
 path: data/datasets/mpi3d/mpi3d_real.npz
 
 _dataset_params:

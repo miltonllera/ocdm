@@ -7,16 +7,46 @@ defaults:
   - override /trainer: gpu
   - _self_
 
-# all parameters below will be merged with parameters from default configurations set above
-# this allows you to overwrite only specified parameters
-
-task_name: unsupervised_mpi3d
-
-tags: ["mpi3d", "slot_ae", "cylinder_to_vertical_axis"]
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "mpi3d", "slot_ae", "cylinder_to_vertical_axis"]
 
 seed: null
 
 test: True
+
+model:
+  slot:
+    n_slots: 3
+  # encoder:
+  #   layer_defs:
+  #     - [conv, [64, 4, 2, 1]]
+  #     - [relu]
+  #     - [conv, [64, 4, 2, 1]]
+  #     - [relu]
+  #     - [permute, [0, 2, 3, 1]]
+  #     - [posemb2d, {embed: cardinal}]
+  #     - [flatten, [1, 2]]
+  #     - [layer_norm, [-1]]
+  #     - [linear, ["${model.slot.input_size}"]]
+  #     - [relu]
+  # decoder:
+  #   layer_defs:
+  #     - [spatbroad, [16, 16], {input_last: True}]
+  #     - [posemb2d, {embed: cardinal}]
+  #     - [permute, [0, 3, 1, 2]]
+  #     - [tconv, [64, 4, 2, 1]]
+  #     - [relu]
+  #     - [tconv, ["${sum:${model.encoder.input_size.0},1}", 4, 2, 1]]
+
+  training:
+    optimizer:
+      lr: 0.0004
+
+    schedulers:
+      exponential:
+        gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
 
 dataset:
   batch_size: 64

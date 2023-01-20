@@ -6,15 +6,20 @@ contains transformations of simple sprites in 2 dimensions, which have no
 detailed features.
 
 The original dataset can be found at:
+
     https://github.com/deepmind/3d-shapes
+
 """
 
-
+# import os
+import h5py
 from typing import Optional, Callable
+
 import numpy as np
 import torch
 import torchvision.transforms as trans
 from torch.utils.data.dataset import Dataset
+# from skimage.color import hsv2rgb
 
 from .utils import class_property
 
@@ -30,8 +35,8 @@ class DSprites(Dataset):
     # shape:               1=heart, 2=ellipsis, 3=square                      3
     # scale                uniform in range [0.5, 1.0]                        6
     # orientation          uniform in range [0, 2 * pi]                      40
-    # position x           unifrom in range [0, 1]                           36
-    # position y           unifrom in range [0, 1]                           36
+    # position x           unifrom in range [0, 1]                           32
+    # position y           unifrom in range [0, 1]                           32
     """
     urls = {"train": "https://github.com/deepmind/dsprites-dataset/blob/master/"
                      "dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz?raw=true"}
@@ -65,7 +70,6 @@ class DSprites(Dataset):
                                     0.51612903, 0.5483871, 0.58064516,
                                     0.61290323, 0.64516129, 0.67741935,
                                     0.70967742, 0.74193548, 0.77419355,
-                                    0.70967742, 0.74193548, 0.77419355,
                                     0.80645161, 0.83870968, 0.87096774,
                                     0.90322581, 0.93548387, 0.96774194, 1.]),
                   'scale': np.array([0.5, 0.6, 0.7, 0.8, 0.9, 1.]),
@@ -87,12 +91,18 @@ class DSprites(Dataset):
                   'shape': np.array([1., 2., 3.]),
               }
 
-    def __init__(self,
-        images: np.ndarray,
-        factor_values: np.ndarray,
-        factor_classes: np.ndarray,
+    def __init__(
+        self,
+        path: str,
+        factor_filter: Optional[Callable],
         _getter: Optional[Callable] = None,
     ):
+        (
+            images,
+            factor_values,
+            factor_classes
+        ) = self.load_raw(path, factor_filter)
+
         self.images = images
         self.factor_values = factor_values
         self.factor_classes = factor_classes
@@ -124,11 +134,12 @@ class DSprites(Dataset):
 
     @staticmethod
     def load_raw(path, factor_filter=None):
-        data_zip = np.load(path, allow_pickle=True)
+        # data_zip = np.load(path, allow_pickle=True)
+        data_zip = h5py.File(path, 'r')
 
-        imgs = data_zip['imgs'] * 255
-        factor_values = data_zip['latents_values'][:, 1:]  # Remove luminescence
-        factor_classes = data_zip['latents_classes'][:, 1:]
+        imgs = data_zip['imgs'][()] * 255
+        factor_values = data_zip['latents']['values'][:, 1:]
+        factor_classes = data_zip['latents']['classes'][:, 1:]
 
         if factor_filter is not None:
             idx = factor_filter(factor_values, factor_classes)
@@ -142,8 +153,54 @@ class DSprites(Dataset):
 
         return imgs, factor_values, factor_classes
 
+    @staticmethod
+    def get_splits():
+        return {
+            "interp": {},
 
-class _splits:
+            "loo": {
+                'leave1out'  : _masks.leave1out
+            },
+
+            "combgen": {
+                'sqr2tx'     : _masks.square_to_posX,
+                'ell2tx'     : _masks.ellipse_to_posX,
+                'sqr2scl'    : _masks.square_to_scale,
+                'sqr2tx_cent': _masks.centered_sqr2tx,
+                'sqr2tx_flnk': _masks.flanked_sqr2tx,
+                'sqr2tx_rs'  : _masks.rshift_sqr2tx,
+                'sqr2tx_ls'  : _masks.lshift_sqrt2tx,
+                'heart2rot'  : _masks.heart_to_rot,
+            },
+
+            "extrap": {
+                'blank_side' : _masks.blank_side
+            },
+        }
+
+    @staticmethod
+    def get_modifiers():
+        return {
+            'sparse_posX': _masks.sparse_posX,
+            'halve_pos': _masks.halve_pos,
+            'halve_rots': _masks.halve_rots,
+            'remove_redundant_rotations': _masks.remove_redundant_rots
+        }
+
+
+def shape_prediction(targets: np.ndarray) -> np.ndarray:
+    object_shape = np.zeros(3, dtype=np.float32)
+    object_shape[int(targets[0])] = 1.  # one hot shape
+    return object_shape[None]
+
+
+def posx_prediction(targets: np.ndarray) -> np.ndarray:
+    object_position = np.zeros(1, dtype=np.float32)
+    object_position[0] = targets[3]
+    return object_position[None]
+
+
+class _masks:
     shp, scl, rot, tx, ty = 0, 1, 2, 3, 4
     a90, a120, a180, a240 = np.pi / 2, 4 * np.pi / 3, np.pi, 2 * np.pi / 3
 
@@ -176,6 +233,19 @@ class _splits:
 
             return square_rot | ellipsis_rot | all_hearts
 
+        return modifier
+
+    @class_property
+    def halve_pos(cls):
+        def modifier(factor_values, factor_classes):
+            return ((factor_classes[:, cls.tx] % 2 == 0) &
+                    (factor_classes[:, cls.ty] % 2 == 0))
+        return modifier
+
+    @class_property
+    def halve_rots(cls):
+        def modifier(factor_values, factor_classes):
+            return factor_classes[:, cls.rot] % 2 == 0
         return modifier
 
     # masks for blank right side condition
@@ -293,40 +363,11 @@ class _splits:
 
     @class_property
     def heart_to_rot(cls):
-        def train_mask(factor_values, factor_classes):
-            return ((factor_values[:, cls.shp] != 3) |
-                    (factor_values[:, cls.rot] < cls.a180))
-
         def test_mask(factor_values, factor_classes):
-            return ~train_mask(factor_values, factor_classes)
+            return ((factor_values[:, cls.shp] == 3) &
+                    (factor_values[:, cls.rot] >= cls.a180))
+
+        def train_mask(factor_values, factor_classes):
+            return ~test_mask(factor_values, factor_classes)
 
         return train_mask, test_mask
-
-
-splits = {
-    "interp": {},
-
-    "loo": {
-        'leave1out'  : _splits.leave1out
-    },
-
-    "combgen": {
-        'sqr2tx'     : _splits.square_to_posX,
-        'ell2tx'     : _splits.ellipse_to_posX,
-        'sqr2scl'    : _splits.square_to_scale,
-        'sqr2tx_cent': _splits.centered_sqr2tx,
-        'sqr2tx_flnk': _splits.flanked_sqr2tx,
-        'sqr2tx_rs'  : _splits.rshift_sqr2tx,
-        'sqr2tx_ls'  : _splits.lshift_sqrt2tx,
-        'heart2rot'  : _splits.heart_to_rot,
-    },
-
-    "extrap": {
-        'blank_side' : _splits.blank_side
-    },
-}
-
-modifiers = {
-    'sparse_posX': _splits.sparse_posX,
-    'remove_redundant_rotations': _splits.remove_redundant_rots
-}

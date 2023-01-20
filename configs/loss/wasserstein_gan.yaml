@@ -1,0 +1,4 @@
+_target_: src.training.loss.WassersteinAdversarial
+lambda1: 10.0
+lambda2: 0.000
+prior_var: 1.0

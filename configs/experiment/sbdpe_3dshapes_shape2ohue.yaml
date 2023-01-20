@@ -1,0 +1,41 @@
+# @package _global_
+
+defaults:
+  - override /dataset: 3dshapes  # override avoids conflicts with default config
+  - override /model: sbd
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "3dshapes", "wass_sbd", "shape_to_ohue"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 64
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: shape2ohue
+
+model:
+  encoder:
+    input_size: [3, 64, 64]
+  training:
+    optimizer:
+      lr: 0.00001
+      weight_decay: 0.0
+
+trainer:
+  min_epochs: 1
+  max_epochs: 30
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

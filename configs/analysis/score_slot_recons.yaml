@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - score_recons
+
+metrics:
+  recons_mse:
+    output_transform:
+      pred_transform:
+        idx: [0,0]

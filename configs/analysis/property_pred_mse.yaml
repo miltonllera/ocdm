@@ -1,0 +1,15 @@
+# @package _global_
+
+defaults:
+  - base
+  # - /loss@metric.property_classification.output_transform.assignment_cost: huber
+
+metrics:
+  property_classification:
+    _target_: ignite.metrics.MeanSquaredError
+    output_transform:
+      _target_: src.model.property_prediction.PropertyPrediction
+      assignment_cost:
+        _target_: torch.nn.HuberLoss
+        reduction: none
+      target_object: 0

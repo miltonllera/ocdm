@@ -1,0 +1,15 @@
+defaults:
+  - latent_prediction_shape_from_shape_and_rotation
+  - _self_
+
+tags: ["supervised", "pentominos", "latent_pred", "rotation_from_shape_and_rotation"]
+
+model:
+  n_properties: 1
+
+dataset:
+  _getter_params:
+  target_transform:
+    _target_: src.dataset.transforms.Compose
+    transforms:
+      - "${get_fn: src.dataset.pentominos.rotation_prediction}"

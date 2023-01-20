@@ -1,0 +1,50 @@
+# @package _global_
+
+defaults:
+  - override /dataset: property_prediction_dsprites
+  - override /model: slot_pred
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["supervised", "dsprites", "slot_pred", "posx_from_shape2px"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 512
+  # split_sizes: [0.9, 0.05, 0.05]
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: sqr2tx
+  rebalance_wrt_factor: shape
+  _getter_params:
+    # pred_type: class
+    target_transform:
+      transforms:
+        - "${get_fn: src.dataset.dsprites.posx_prediction}"
+
+model:
+  n_properties: 1
+  slot_ae:
+    run_path: data/logs/unsupervised/dsprites/slot_ae/square_to_posX/2023-02-12_18-32
+
+  training:
+    optimizer:
+      lr: 0.0004
+
+trainer:
+  min_epochs: 1
+  max_epochs: 50
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"
+

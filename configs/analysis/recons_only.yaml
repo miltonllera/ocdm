@@ -1,0 +1,13 @@
+# @package _global_
+
+defaults:
+  - base
+
+metrics: null
+
+visualizations:
+  reconstruction:
+    _target_: bin.extra.visualization.ReconstructionViz
+    recons_extractor:
+      _target_: bin.extra.utils.IndexSelector
+      idx: 0

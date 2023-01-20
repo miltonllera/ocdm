@@ -8,8 +8,11 @@ analyzing the results. Data loading of the batches is handled in the
 corresponding Sacred ingredient.
 
 The original dataset can be found at:
+
     https://github.com/deepmind/3d-shapes
+
 """
+
 from itertools import product
 from typing import Optional, Callable, Literal
 
@@ -67,13 +70,19 @@ class Shapes3D(Dataset):
                                      12.85714286, 17.14285714, 21.42857143,
                                      25.71428571,  30.])}
 
-    def __init__(self,
-        images: np.ndarray,
-        factor_values: np.ndarray,
-        factor_classes: np.ndarray,
+    def __init__(
+        self,
+        path: str,
+        factor_filter: Optional[Callable],
         color_format: Literal["rgb", "hsv"] = "rgb",
         _getter: Optional[Callable] = None,
     ):
+        (
+            images,
+            factor_values,
+            factor_classes
+        ) = self.load_raw(path, factor_filter)
+
         self.images = images
         self.factor_values = factor_values
         self.factor_classes = factor_classes
@@ -128,8 +137,90 @@ class Shapes3D(Dataset):
 
         return imgs, factor_values, factor_classes
 
+    @staticmethod
+    def get_splits():
+        return {
+            'interp': {
+                'odd_ohue'    : _masks.odd_ohue,
+                'odd_wnf_hue' : _masks.odd_wnf_hue,
+            },
 
-class _splits:
+            'loo' : {
+                'shape2ohue' : _masks.shape_ohue,
+                'leave1out'  : _masks.leave1out,
+            },
+
+            'combgen': {
+                'ohue2whue'      : _masks.ohue_to_whue,
+                'fhue2whue'      : _masks.fhue_to_whue,
+                'shape2ohue'     : _masks.shape_to_objh,
+                'shape2ohueq'    : _masks.shape_to_objh_quarter,
+                'shape2fhue'     : _masks.shape_to_floor,
+                'shape2orient'   : _masks.shape_to_orientation,
+                'shape2ohue_flnk': _masks.flanked_shape2ohue
+            },
+
+            'extrap': {
+                'missing_fh' : _masks.missing_fh_50
+            },
+        }
+
+    @staticmethod
+    def get_modifiers():
+        return  {
+            'even_ohues'   : _masks.exclude_odd_ohues,
+            'half_ohues'   : _masks.exclude_half_ohues,
+            'even_wnf_hues': _masks.exclude_odd_wnf_hues
+        }
+
+
+def shape_prediction(targets: np.ndarray) -> np.ndarray:
+    # central object properties are already defined
+    # object_properties = targets[2:]
+    object_shape = np.zeros(6, dtype=np.float32)
+    object_shape[int(targets[4])] = 1.  # one hot shape
+    # object_properties[6] = targets[2] / 0.9  # add object hue
+    # object_properties[7] = (targets[3] - 0.75) / 0.5  # add scale
+    # object_properties[8] = (targets[5] + 30.) / 60.
+
+    # for the wall we take the mean scale and add a new shape value
+    # floor_properties = np.asarray([
+    #     targets[0], 1., 4.0, targets[5]
+    # ])
+    floor_shape = np.zeros(6, dtype=np.float32)
+    floor_shape[4] = 1.0
+    # floor_properties[6] = targets[0] / 0.9  # add object hue
+    # floor_properties[7] = 1.0 # add scale
+    # floor_properties[8] = (targets[5] + 30.) / 60.
+
+
+    # same for the wall, just use its hue value and a different shape value
+    # wall_properties = np.asarray([
+    #     targets[1], 1., 5.0, targets[5]
+    # ])
+    wall_shape = np.zeros(6, dtype=np.float32)
+    wall_shape[5] = 1.0
+    # wall_properties[6] = targets[1] / 0.9  # add object hue
+    # wall_properties[7] = 1.0 # add scale
+    # wall_properties[8] = (targets[5] + 30.) / 60.
+
+    return np.stack([object_shape, floor_shape, wall_shape])
+
+
+def ohue_prediction(targets: np.ndarray) -> np.ndarray:
+    object_hue = np.zeros(10, dtype=np.float32)
+    object_hue[targets[2]] = 1.  # one hot object hue
+
+    floor_hue = np.zeros(10, dtype=np.float32)
+    floor_hue[targets[0]] = 1.0
+
+    wall_hue = np.zeros(10, dtype=np.float32)
+    wall_hue[targets[1]] = 1.0
+
+    return np.stack([object_hue, floor_hue, wall_hue])
+
+
+class _masks:
     """
     Boolean masks used to partition the Shapes3D dataset
     for each generalisation condition
@@ -294,36 +385,3 @@ class _splits:
             return ~test_mask(factor_values, factor_classes)
 
         return train_mask, test_mask
-
-
-splits = {
-    'interp': {
-        'odd_ohue'    : _splits.odd_ohue,
-        'odd_wnf_hue' : _splits.odd_wnf_hue,
-    },
-
-    'loo' : {
-        'shape2ohue' : _splits.shape_ohue,
-        'leave1out'  : _splits.leave1out,
-    },
-
-    'combgen': {
-        'ohue2whue'      : _splits.ohue_to_whue,
-        'fhue2whue'      : _splits.fhue_to_whue,
-        'shape2ohue'     : _splits.shape_to_objh,
-        'shape2ohueq'    : _splits.shape_to_objh_quarter,
-        'shape2fhue'     : _splits.shape_to_floor,
-        'shape2orient'   : _splits.shape_to_orientation,
-        'shape2ohue_flnk': _splits.flanked_shape2ohue
-    },
-
-    'extrap': {
-        'missing_fh' : _splits.missing_fh_50
-    },
-}
-
-modifiers = {
-    'even_ohues'   : _splits.exclude_odd_ohues,
-    'half_ohues'   : _splits.exclude_half_ohues,
-    'even_wnf_hues': _splits.exclude_odd_wnf_hues
-}
