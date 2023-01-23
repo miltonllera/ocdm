@@ -20,7 +20,9 @@ test: True
 
 dataset:
   batch_size: 64
-  split_sizes: [0.9, 0.05, 0.05]
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: shape2ohue
 
 model:
   optimizer:
