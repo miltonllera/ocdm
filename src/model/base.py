@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Iterable, TypedDict, Optional
+from typing import Callable, Iterable, Tuple, TypedDict, Optional
 
+import torch
 import pytorch_lightning as pl
 from torch.nn.parameter import Parameter
 from torch.optim import Optimizer
@@ -36,11 +37,21 @@ class BaseModel(pl.LightningModule, ABC):
 
     @abstractmethod
     def forward(self, inputs):
+        """
+        Computes outputs from all modules in the model.
+        """
         pass
 
-    # @abstractmethod
-    # def parameters(self, recurse: bool = True) -> Iterator[Parameter]:
-    #     pass
+    @abstractmethod
+    def _step(self, batch, batch_idx, phase):
+        """
+        Method to process a batch and perform common computations on the results.
+
+        This method can be used to encapsulate common processing while allowing
+        train/validation/test steps to add functionality like computing extra
+        metrics or adding visulizations.
+        """
+        pass
 
     def configure_optimizers(self):
         optimizer = self.optimizer_init(self.parameters())
@@ -56,3 +67,24 @@ class BaseModel(pl.LightningModule, ABC):
             config['lr_scheduler'] = scheduler_config
 
         return config
+
+    def training_step(
+        self,
+        batch: Tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int
+    ):
+        return self._step(batch, batch_idx, "train")
+
+    def validation_step(
+        self,
+        batch: Tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int
+    ):
+        return self._step(batch, batch_idx, "val")
+
+    def test_step(
+        self,
+        batch: Tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int
+    ):
+        return self._step(batch, batch_idx, "test")

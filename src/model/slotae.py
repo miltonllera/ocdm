@@ -26,8 +26,8 @@ class SlotAutoEncoder(BaseModel):
     def forward(self, inputs: torch.Tensor):
         h = self.encoder(inputs)
         slots = self.slot_atten(h)
-        recons, slot_masks = self.slot_decoder(slots)
-        return (recons, slot_masks), slots
+        recons, decoder_masks = self.slot_decoder(slots)
+        return (recons, decoder_masks), slots
 
     def _step(
         self,
@@ -52,24 +52,3 @@ class SlotAutoEncoder(BaseModel):
         )
 
         return loss
-
-    def training_step(
-        self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
-        return self._step(batch, batch_idx, "train")
-
-    def validation_step(
-        self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
-        return self._step(batch, batch_idx, "val")
-
-    def test_step(
-        self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
-        return self._step(batch, batch_idx, "test")

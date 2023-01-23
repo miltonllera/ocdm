@@ -88,25 +88,33 @@ class SLATE(BaseModel):
         return (recons, (slots, attn_weights), (z, logits),
                 (token_logits, token_idxs))
 
-    def training_step(
-        self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
+    def _step(self, batch, batch_idx, phase):
         inputs, targets = batch
 
-        recons, _, _, tokens = self.forward(inputs)
+        recons, slots, zs, tokens = self.forward(inputs)
 
         recons_loss = self.recons_loss(recons, targets)
         token_loss = self.token_loss(*tokens)
         loss = recons_loss + token_loss
 
+        metrics = {
+                f"{phase}/loss": loss,
+                f"{phase}/token_xent": token_loss,
+                f"{phase}/reconstruction_loss": recons_loss
+            }
+
+        return recons, slots, zs, tokens, metrics
+
+
+    def training_step(
+        self,
+        batch: Tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int
+    ):
+        recons, _, _, tokens, metrics = self._step(batch, batch_idx, "train")
+
         self.log_dict(
-            {
-                "train/loss": loss,
-                "train/token_xent": token_loss,
-                "train/reconstruction_loss": recons_loss
-            },
+            metrics,
             on_step=True,
             on_epoch=False,
             prog_bar=True,
@@ -123,7 +131,7 @@ class SLATE(BaseModel):
             on_epoch=False
         )
 
-        return loss
+        return metrics["train/loss"]
 
     def validation_step(
         self,
@@ -131,38 +139,30 @@ class SLATE(BaseModel):
         batch_idx: int,
         phase: Literal["val", "test"] = "val"
     ):
-        inputs, targets = batch
-        recons, slot_output, _, tokens = self.forward(inputs)
-
-        recons_loss = self.recons_loss(recons, targets)
-        token_loss = self.token_loss(*tokens)
-        total_loss = recons_loss + token_loss
-
-        metrics_dict = {
-                f"{phase}/loss": total_loss,
-                f"{phase}/token_xent": token_loss,
-                f"{phase}/patch_recons": recons_loss,
-            }
+        _, slots, _, tokens, metrics = self._step(batch, batch_idx, phase)
 
         if (phase == "test") or (phase == "val" and
             (batch_idx < self._ar_val_batches)):
+            target_tokens, target_images = tokens[1], batch[1]
 
-            ar_recons, sampled_tokens = self.autoregressive_recons(slot_output)
+            ar_recons, sampled_tokens = self.autoregressive_recons(slots)
 
-            ar_recons_loss = self.recons_loss(ar_recons, targets)
-            ar_token_xent = self.token_loss(sampled_tokens, tokens[1])
+            ar_recons_loss = self.recons_loss(ar_recons, target_images)
+            ar_token_xent = self.token_loss(sampled_tokens, target_tokens)
 
-            metrics_dict[f"{phase}/autoregressive_recons"] = ar_recons_loss
-            metrics_dict[f"{phase}/autoregressive_token_xent"] = ar_token_xent
+            metrics[f"{phase}/autoregressive_recons"] = ar_recons_loss
+            metrics[f"{phase}/autoregressive_token_xent"] = ar_token_xent
 
         self.log_dict(
-            metrics_dict,
+            metrics,
             on_step=False,
             on_epoch=True,
             prog_bar=False,
             sync_dist=True,
             rank_zero_only=True
         )
+
+        return metrics[f"{phase}/loss"]
 
     def test_step(
         self,

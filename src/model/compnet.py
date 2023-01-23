@@ -87,24 +87,3 @@ class CompositionNet(BaseModel):
         )
 
         return loss
-
-    def training_step(
-        self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
-        return self._step(batch, batch_idx, "train")
-
-    def validation_step(
-        self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
-        return self._step(batch, batch_idx, "val")
-
-    def test_step(
-        self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
-        return self._step(batch, batch_idx, "test")

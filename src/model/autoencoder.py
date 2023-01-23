@@ -37,13 +37,6 @@ class VariationalAutoEncoder(BaseModel):
         recons = self.decoder(z)
         return recons, z, params
 
-    # def parameters(self):
-    #     return chain(
-    #         self.encoder.parameters(),
-    #         self.decoder.parameters(),
-    #         self.latent.parameters(),
-    #     )
-
     def embed(self, inputs):
         return self.latent(self.encoder(inputs))[0]
 
@@ -85,24 +78,3 @@ class VariationalAutoEncoder(BaseModel):
         )
 
         return loss
-
-    def training_step(
-        self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
-        return self._step(batch, batch_idx, "train")
-
-    def validation_step(
-        self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
-        return self._step(batch, batch_idx, "val")
-
-    def test_step(
-        self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
-        return self._step(batch, batch_idx, "test")
