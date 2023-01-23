@@ -1,7 +1,7 @@
 # @package _global_
 
 defaults:
-  - override /dataset: 3dshapes
+  - override /dataset: mpi3d
   - override /model: slate
   - override /callbacks: default
   - override /trainer: gpu
@@ -14,7 +14,7 @@ defaults:
 
 task_name: unsupervised_3dshapes
 
-tags: ["3dshapes", "slate", "baseline"]
+tags: ["mpi3d", "slate", "cylinder_to_vertical_axis"]
 
 seed: null
 
@@ -24,7 +24,7 @@ dataset:
   batch_size: 64
   split_sizes: [0.95, 0.05]
   split_condition: combgen
-  split_variant: shape2ohue
+  split_variant: cyl2vx
 
 model:
   optimizer:

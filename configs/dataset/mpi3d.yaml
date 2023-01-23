@@ -3,7 +3,7 @@ defaults:
   - _self_
 
 dataset_name: mpi3d
-path: data/datasets/mpi3d/
+path: data/datasets/mpi3d/mpi3d_real.npz
 
 _dataset_params:
   color_format: rgb

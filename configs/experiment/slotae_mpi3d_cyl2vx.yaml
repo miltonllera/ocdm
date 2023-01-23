@@ -1,0 +1,40 @@
+# @package _global_
+
+defaults:
+  - override /dataset: mpi3d
+  - override /model: slot_ae
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+task_name: unsupervised_mpi3d
+
+tags: ["mpi3d", "slot_ae", "cylinder_to_vertical_axis"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 64
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: cyl2vx
+  split_modifiers: [four_shapes, lhalf_hx]
+
+model:
+  optimizer:
+    lr: 0.0004
+
+trainer:
+  min_epochs: 1
+  max_epochs: 20
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

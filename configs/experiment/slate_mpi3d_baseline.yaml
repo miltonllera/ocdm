@@ -1,0 +1,44 @@
+# @package _global_
+
+defaults:
+  - override /dataset: mpi3d
+  - override /model: slate
+  - override /callbacks: default
+  - override /trainer: gpu
+  - override /scheduler@model.scheduler: exponential
+  # - override /scheduler@model.scheduler: reduce_on_plateau
+  - _self_
+
+# all parameters below will be merged with parameters from configurations in
+# the defaults list this allows you to overwrite only specific parameters.
+
+task_name: unsupervised_3dshapes
+
+tags: ["mpi3d", "slate", "baseline"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 64
+  split_sizes: [0.9, 0.05, 0.05]
+
+model:
+  optimizer:
+    lr: 0.0003
+  scheduler:
+    gamma: 0.999993069  # 0.5 ** (1 / 100000)
+  scheduler_metric: "val/token_xent"
+
+  _ar_val_batches: 10
+
+trainer:
+  min_epochs: 1
+  max_epochs: 20
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"
