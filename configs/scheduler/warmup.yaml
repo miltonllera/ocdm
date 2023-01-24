@@ -1,6 +1,0 @@
-_target_: src.training.scheduler.WarmupLR
-_partial_: True
-
-start_value: 0.0
-warmup_steps: 30000
-warmup_groups: null

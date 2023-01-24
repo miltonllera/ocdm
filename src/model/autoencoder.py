@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from src.layers.initialization import weights_init
 from src.training.loss import ReconstructionLoss
-from .base import BaseModel, OptimizerInit, SchedulerInit
+from .base import BaseModel, TrainingInit
 
 
 class VariationalAutoEncoder(BaseModel):
@@ -15,10 +15,9 @@ class VariationalAutoEncoder(BaseModel):
         decoder: nn.Sequential,
         recons_loss: ReconstructionLoss,
         latent_loss: nn.Module,
-        optimizer: OptimizerInit,
-        scheduler: SchedulerInit = None,
-    ) -> None:
-        super().__init__(optimizer, scheduler)
+        training: TrainingInit,
+    ):
+        super().__init__(training)
         self.encoder = encoder
         self.decoder = decoder
         self.latent = latent

@@ -1,44 +1,23 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Iterable, Tuple, TypedDict, Optional
+from typing import Tuple
 
 import torch
 import pytorch_lightning as pl
-from torch.nn.parameter import Parameter
-from torch.optim import Optimizer
-from torch.optim.lr_scheduler import _LRScheduler as Scheduler
-
-
-OptimizerInit = Callable[[Iterable[Parameter]], Optimizer]
-SchedulerInit = Optional[Callable[[Optimizer], Scheduler]]
-
-
-class SchedulerConfig(TypedDict):
-    scheduler: Scheduler
-    interval: str
-    monitor: Optional[str]
-
-
-class OptimizationConfig(TypedDict, total=False):
-    optimizer: Optimizer
-    lr_scheduler: SchedulerConfig
+from src.training.initializer import OPTIMIZATION_CONFIG, TrainingInit
 
 
 class BaseModel(pl.LightningModule, ABC):
     def __init__(
         self,
-        optimizer: OptimizerInit,
-        scheduler: SchedulerInit = None,
-        scheduler_metric: Optional[str] = "train/loss",
+        training: TrainingInit
     ) -> None:
         super().__init__()
-        self.optimizer_init = optimizer
-        self.scheduler_init = scheduler
-        self.scheduler_metric = scheduler_metric
+        self.training_init = training
 
     @abstractmethod
     def forward(self, inputs):
         """
-        Computes outputs from all modules in the model.
+        Computes and chains outputs from all modules in the model.
         """
         pass
 
@@ -53,20 +32,8 @@ class BaseModel(pl.LightningModule, ABC):
         """
         pass
 
-    def configure_optimizers(self):
-        optimizer = self.optimizer_init(self.parameters())
-        config: OptimizationConfig = {'optimizer': optimizer}
-
-        if self.scheduler_init is not None:
-            scheduler = self.scheduler_init(optimizer)
-            scheduler_config: SchedulerConfig = {
-                'scheduler': scheduler,
-                'interval': "step",
-                'monitor': self.scheduler_metric,
-            }
-            config['lr_scheduler'] = scheduler_config
-
-        return config
+    def configure_optimizers(self) -> OPTIMIZATION_CONFIG:
+        return self.training_init.initialize(self.parameters())
 
     def training_step(
         self,

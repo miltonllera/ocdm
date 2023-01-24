@@ -24,9 +24,9 @@ class IIDDataModule(LightningDataModule):
         batch_size: int = 64,
         num_workers: int = 4,
         split_data: bool = True,
-        split_seed: Optional[int] = None,  # useful for distributed training
         split_sizes: Sequence[Union[int, float]] = [0.90, 0.05, 0.05],
         rebalance_wrt_factor: Optional[int] = None,
+        _split_seed: Optional[int] = None,  # useful for distributed training
         _dataset_params: Optional[Dict[str, Any]] = None,
         _getter_params: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -36,12 +36,15 @@ class IIDDataModule(LightningDataModule):
         if _getter_params is None:
             _getter_params = {}
 
+        if _split_seed is None:
+            _split_seed = 42
+
         super().__init__()
         self.tranform = transform
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.split_data = split_data
-        self.split_seed = split_seed
+        self.split_seed = _split_seed
         self.split_sizes = split_sizes
 
         if setting == "supervised":
@@ -94,10 +97,7 @@ class IIDDataModule(LightningDataModule):
             self.train_data = self.val_data = dataset
 
         else:
-            if self.split_seed is not None:
-                generator = torch.Generator().manual_seed(self.split_seed)
-            else:
-                generator = None
+            generator = torch.Generator().manual_seed(self.split_seed)
 
             splits = random_split(
                 dataset=dataset,

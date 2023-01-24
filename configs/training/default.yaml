@@ -1,0 +1,9 @@
+defaults:
+  - _self_
+  - /training@optimizer: adam
+
+_target_: src.training.initializer.TrainingInit
+
+schedulers: null
+
+scheduling_metric: null

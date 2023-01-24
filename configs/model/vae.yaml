@@ -8,7 +8,7 @@ defaults:
   - base_lgm
   - /loss@recons_loss: recons_bce
   - /loss@latent_loss: gaussian_kl
-  - /optimizer: adam
+  - /training: default
   - _self_
 
 _target_: src.model.autoencoder.VariationalAutoEncoder

@@ -237,23 +237,29 @@ class SlotDecoder(nn.Sequential):
 
 
 class SlotMixtureDecoder(nn.Sequential):
-    def __init__(self, layers, return_weights=False):
+    def __init__(self, input_size, slot_size, layers, return_weights=False):
         super().__init__(*layers)
+        self.q_proj = nn.Linear(input_size, slot_size)
+        # self.k_proj = nn.Linear(slot_size, slot_size)
         self.return_weights = return_weights
 
-    def mix_slots(self, position_embbedings, slots):
-        q, k = position_embbedings, slots
+
+    def mix_slots(self, pos_emb, slots):
+        pos_emb = pos_emb.expand(len(slots), -1, -1)
+
+        q = self.q_proj(pos_emb) # B, N_pe, Size
+        k = slots
 
         weights = k @ q.transpose(2, 3)  # n_slots, positions
-        # weights = F.softmax(join_heads(weights), dim=1)
+        # weights = F.softmax(join_heads(weights), dim==1)
         weights = F.softmax(weights, dim=-1)
 
-        weights = weights + EPS
-        weights = weights / weights.sum(dim=-2, keepdim=True)
+        # weights = weights + EPS
+        # weights = weights / weights.sum(dim=-2, keepdim=True)
 
-        atten_maps = weights.transpose(2, 3) @ slots
+        mix_slots = weights.transpose(1, 2) @ slots
 
-        return atten_maps, weights
+        return mix_slots, weights
 
     def forward(self, inputs):
         slots, pe = inputs

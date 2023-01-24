@@ -1,2 +1,0 @@
-_target_: torch.optim.lr_scheduler.ChainedScheduler
-schedulers:

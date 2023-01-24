@@ -28,9 +28,10 @@ model:
   composition_op:
     _target_: src.layers.composition.FixedInterpolationComp
     n_actions: 5
-  optimizer:
-    lr: 0.001
-    weight_decay: 0.0
+  training:
+    optimizer:
+      lr: 0.001
+      weight_decay: 0.0
 
 trainer:
   min_epochs: 1

@@ -25,10 +25,6 @@ dataset:
   split_variant: cyl2vx
   split_modifiers: [four_shapes, lhalf_hx]
 
-model:
-  optimizer:
-    lr: 0.0004
-
 trainer:
   min_epochs: 1
   max_epochs: 20

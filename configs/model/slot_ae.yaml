@@ -1,7 +1,8 @@
 defaults:
   - /loss: recons_mse
-  - /optimizer: adam
-  - /scheduler: warmup
+  - /training: default
+  - /training@training.schedulers.exponential: exponential
+  - /training@training.schedulers.warmup: warmup
   - _self_
 
 _target_: src.model.slotae.SlotAutoEncoder
@@ -46,3 +47,13 @@ decoder:
     - [tconv, [64, 1, 1, 0]]
     - [relu]
     - [tconv, ["${sum:${model.encoder.input_size.0},1}", 4, 2, 1]]
+
+training:
+  optimizer:
+    lr: 0.0004
+
+  schedulers:
+    exponential:
+      gamma: 0.999993069  # 0.5 ** (1 / 100000)
+
+  scheduling_metric: "val/loss"

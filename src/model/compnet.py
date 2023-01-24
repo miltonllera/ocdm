@@ -6,7 +6,7 @@ import torch.nn as nn
 from src.training.loss import ReconstructionLoss
 from src.layers.composition import CompositionOp
 
-from .base import BaseModel, OptimizerInit
+from .base import BaseModel, TrainingInit
 
 
 class CompositionNet(BaseModel):
@@ -18,9 +18,9 @@ class CompositionNet(BaseModel):
         decoder: nn.Sequential,
         recons_loss: ReconstructionLoss,
         latent_loss: nn.Module,
-        optimizer: OptimizerInit,
+        training: TrainingInit,
     ):
-        super().__init__(optimizer)
+        super().__init__(training)
         self.encoder = encoder
         self.latent = latent
         self.composition_op = composition_op

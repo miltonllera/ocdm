@@ -3,7 +3,7 @@ from typing import Literal, Optional, Tuple
 import torch
 import torch.nn as nn
 
-from src.model.base import BaseModel, OptimizerInit, SchedulerInit
+from src.model.base import BaseModel, TrainingInit
 from src.layers.slot import SlotAttention
 from src.layers.transformer import TransformerDecoder
 from src.layers.stochastic import GumbelSoftmax
@@ -23,13 +23,11 @@ class SLATE(BaseModel):
         slot: SlotAttention,
         transformer_decoder: TransformerDecoder,
         loss: ReconstructionLoss,
-        optimizer: OptimizerInit,
-        scheduler: SchedulerInit,
-        scheduler_metric: Optional[str] = None,
+        training: TrainingInit,
         use_memory_mask: bool = False,
         _ar_val_batches: int = 10,
     ):
-        super().__init__(optimizer, scheduler, scheduler_metric)
+        super().__init__(training)
         H, W = resolution
 
         self.resolution = resolution

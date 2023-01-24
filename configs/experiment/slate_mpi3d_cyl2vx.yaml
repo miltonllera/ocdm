@@ -5,8 +5,8 @@ defaults:
   - override /model: slate
   - override /callbacks: default
   - override /trainer: gpu
-  - override /scheduler@model.scheduler: exponential
-  # - override /scheduler@model.scheduler: reduce_on_plateau
+  # - override /scheduler@model.training.scheduler.exponential: exponential
+  # - override /scheduler@model.training.scheduler.reduce_on_plateau: reduce_on_plateau
   - _self_
 
 # all parameters below will be merged with parameters from configurations in
@@ -27,12 +27,6 @@ dataset:
   split_variant: cyl2vx
 
 model:
-  optimizer:
-    lr: 0.0003
-  scheduler:
-    gamma: 0.999993069  # 0.5 ** (1 / 100000)
-  scheduler_metric: "val/token_xent"
-
   _ar_val_batches: 10
 
 trainer:

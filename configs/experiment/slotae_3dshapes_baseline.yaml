@@ -23,12 +23,13 @@ dataset:
   split_sizes: [0.9, 0.05, 0.05]
 
 model:
-  optimizer:
-    lr: 0.0004
+  training:
+    optimizer:
+      lr: 0.0004
 
 trainer:
   min_epochs: 1
-  max_epochs: 20
+  max_epochs: 30
   gradient_clip_val: 1.0
 
 callbacks:

@@ -3,7 +3,7 @@ from typing import Literal, Tuple
 import torch
 import torch.nn as nn
 
-from src.model.base import BaseModel, OptimizerInit, SchedulerInit
+from src.model.base import BaseModel, TrainingInit
 from src.layers.slot import SlotAttention, SlotDecoder
 from src.training.loss import ReconstructionLoss
 
@@ -14,10 +14,9 @@ class SlotAutoEncoder(BaseModel):
         decoder: SlotDecoder,
         slot: SlotAttention,
         loss: ReconstructionLoss,
-        optimizer: OptimizerInit,
-        scheduler: SchedulerInit = None,
+        training: TrainingInit,
     ):
-        super().__init__(optimizer, scheduler)
+        super().__init__(training)
         self.encoder = encoder
         self.slot_atten = slot
         self.slot_decoder = decoder
