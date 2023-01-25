@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Tuple
+from typing import Literal, Tuple
 
 import torch
 import torch.nn as nn

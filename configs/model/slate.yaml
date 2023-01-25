@@ -1,7 +1,7 @@
 defaults:
   - /loss: recons_mse
   - /training: default
-  - /training@training.schedulers.exponential: exponential
+  - /training@training.schedulers.reduce_on_plateau: reduce_on_plateau
   - /training@training.schedulers.warmup: warmup
   - _self_
 
@@ -126,8 +126,9 @@ training:
     lr: 0.0003
 
   schedulers:
-    exponential:
-      gamma: 0.999993069  # 0.5 ** (1 / 100000)
+    reduce_on_plateau:
+      patience: 4
+      factor: 0.5
 
   scheduling_metric: "val/token_xent"
 

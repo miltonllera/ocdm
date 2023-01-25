@@ -27,7 +27,7 @@ dataset:
 
 trainer:
   min_epochs: 1
-  max_epochs: 20
+  max_epochs: 50
   gradient_clip_val: 1.0
 
 callbacks:

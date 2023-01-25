@@ -24,11 +24,6 @@ dataset:
   split_condition: combgen
   split_variant: shape2ohue
 
-model:
-  training:
-    optimizer:
-      lr: 0.0004
-
 trainer:
   min_epochs: 1
   max_epochs: 50

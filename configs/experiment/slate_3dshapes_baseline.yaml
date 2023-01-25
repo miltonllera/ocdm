@@ -28,7 +28,7 @@ model:
 
 trainer:
   min_epochs: 1
-  max_epochs: 20
+  max_epochs: 30
   gradient_clip_val: 1.0
 
 callbacks:

@@ -11,7 +11,7 @@ from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.loggers import LightningLoggerBase
 
-from bin.extra.analysis_module import Analysis
+from bin.extra.analysis import Analysis
 from .utils import get_logger
 
 

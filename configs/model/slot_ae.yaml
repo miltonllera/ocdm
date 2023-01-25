@@ -14,7 +14,7 @@ slot:
   slot_size: 64
   slot_channels: 1
   n_iter: 3
-  hidden_size: 64
+  hidden_size: 128
   approx_implicit_grad: True
 
 encoder:
@@ -23,7 +23,7 @@ encoder:
   layer_defs:
     - [conv, [64, 4, 2, 1]]
     - [relu]
-    - [conv, [64, 1, 1, 0]]
+    - [conv, [64, 4, 2, 1]]
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
@@ -39,12 +39,12 @@ decoder:
   constructor: "${get_cls: src.layers.slot.SlotDecoder}"
   input_size: ${model.slot.slot_size}
   layer_defs:
-    - [spatbroad, [16, 16], {input_last: True}]
+    - [spatbroad, [8, 8], {input_last: True}]
     - [posemb2d, {embed: cardinal}]
     - [permute, [0, 3, 1, 2]]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
-    - [tconv, [64, 1, 1, 0]]
+    - [tconv, [64, 4, 2, 1]]
     - [relu]
     - [tconv, ["${sum:${model.encoder.input_size.0},1}", 4, 2, 1]]
 
@@ -54,6 +54,8 @@ training:
 
   schedulers:
     exponential:
-      gamma: 0.999993069  # 0.5 ** (1 / 100000)
+      gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
+    warmup:
+      warmup_steps: 30000
 
   scheduling_metric: "val/loss"
