@@ -1,0 +1,18 @@
+analysis:
+  _target_: bin.extra.analysis.Analysis
+
+run_path: null
+
+metrics: {}
+
+visualizations: {}
+
+logger:
+  figure_logger:
+    _target_: bin.extra.logger.FolderLogger
+    save_dir: "${run_path}/analysis"
+    name: ""
+
+precompute_outputs: False
+
+collate_fn: "${get_method: bin.extra.utils.collate_slotae_outputs}"

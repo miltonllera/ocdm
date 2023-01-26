@@ -1,17 +1,19 @@
 import os
 import os.path as osp
 from functools import partial
-from typing import Any, List, Tuple, Dict
+from typing import List, Tuple, Dict
+from ignite.metrics import Metric
 
 import torch
 import hydra
 import pytorch_lightning as pl
-from hydra.utils import get_class
+from hydra.utils import get_class, get_method
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.loggers import LightningLoggerBase
 
 from bin.extra.analysis import Analysis
+from bin.extra.visualization import Visualzation
 from .utils import get_logger
 
 
@@ -31,6 +33,9 @@ OmegaConf.register_new_resolver(name="sum", resolver=lambda x, y: x + y)
 OmegaConf.register_new_resolver(name="prod", resolver=lambda x, y: x * y)
 OmegaConf.register_new_resolver(
     name="get_cls", resolver=lambda cls: get_class(cls)
+)
+OmegaConf.register_new_resolver(
+    name="get_fn", resolver=lambda fn: get_method(fn)
 )
 
 
@@ -121,18 +126,18 @@ def instantiate_analysis(cfg: DictConfig) -> Analysis:
 
     datamodule, model, trainer = load_run(cfg.run_path)
 
-    evaluations = instantiate_evaluators(cfg.evaluators)
+    metrics: Dict[str, Metric] = instantiate_metrics(cfg.metrics)
 
-    visualisations = instantiate_visualizations(cfg.visualisatoins)
+    visualizations = instantiate_visualizations(cfg.visualizations)
 
-    logger = instantiate_loggers(cfg.logger)
+    logger = instantiate_loggers(cfg.logger)[0]
 
-    analysis_module: Analysis = instantiate(
-        evaluations=evaluations,
-        visualisations=visualisations,
+    analysis_module = Analysis(
         datamodule=datamodule,
         model=model,
         trainer=trainer,
+        metrics=metrics,
+        visualizations=visualizations,
         logger=logger,
     )
 
@@ -150,28 +155,41 @@ def load_run(run_path: str) -> INSTANTIATED_RUN_MODULES:
     return datamodule, model, trainer
 
 
-def instantiate_evaluators(eval_cfg: DictConfig):
-    evaluators: List[Any] = []
+def instantiate_metrics(
+    metric_cfg: DictConfig
+) -> Dict[str, Metric]:
+    metrics: Dict[str, Metric] = {}
 
-    if not eval_cfg:
-        _log.warning("No evaluator configs found! Skipping...")
-        return evaluators
+    if not metric_cfg:
+        _log.warning("No metric configs found! Skipping...")
+        return metrics
 
-    if not isinstance(eval_cfg, DictConfig):
-        raise TypeError("Evaluator config must be a DictConfig!")
+    if not isinstance(metric_cfg, DictConfig):
+        raise TypeError("Metric config must be a DictConfig!")
 
-    for _, e_conf in eval_cfg.items():
-        if isinstance(e_conf, DictConfig) and "_target_" in e_conf:
-            _log.info(f"Initializing callback <{e_conf._target_}>")
-            evaluators.append(instantiate(e_conf))
+    for name, m_conf in metric_cfg.items():
+        if isinstance(m_conf, DictConfig) and "_target_" in m_conf:
+            _log.info(f"Initializing metric <{m_conf._target_}>")
+            metrics[str(name)] = instantiate(m_conf)
+
+    return metrics
 
 
+def instantiate_visualizations(
+    viz_cfg: DictConfig
+) -> List[Visualzation]:
+    visualizations: List[Visualzation] = []
 
-def instantiate_visualizations(viz_cfg: DictConfig):
     if not viz_cfg:
         _log.warning("No visualisations in analysis! Skipping...")
-        return None
-    raise NotImplementedError()
+        return visualizations
+
+    for _, v_cfg in viz_cfg.items():
+        if isinstance(v_cfg, DictConfig) and "_target_" in v_cfg:
+            _log.info(f"Initializing visualization <{v_cfg._target_}>")
+            visualizations.append(instantiate(v_cfg))
+
+    return visualizations
 
 
 def load_cfg(run_path: str) -> DictConfig:
