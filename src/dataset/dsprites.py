@@ -294,7 +294,7 @@ class _splits:
     @class_property
     def heart_to_rot(cls):
         def train_mask(factor_values, factor_classes):
-            return ((factor_values[:, cls.shp] != 2) |
+            return ((factor_values[:, cls.shp] != 3) |
                     (factor_values[:, cls.rot] < cls.a180))
 
         def test_mask(factor_values, factor_classes):

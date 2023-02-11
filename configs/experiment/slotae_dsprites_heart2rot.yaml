@@ -1,0 +1,42 @@
+# @package _global_
+
+defaults:
+  - override /dataset: dsprites
+  - override /model: slot_ae
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+task_name: unsupervised_dsprites
+
+tags: ["dsprites", "slot_ae", "combgen", "heart2rot"]
+
+seed: null
+
+test: True
+
+dataset:
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: heart2rot
+  split_modifiers: [remove_redundant_rotations]
+
+model:
+  slot:
+    _target_: src.layers.slot.LateralSlotAttention
+    n_slots: 2
+    approx_implicit_grad: False
+  encoder:
+    input_size: [1, 64, 64]
+
+trainer:
+  max_epochs: 60
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

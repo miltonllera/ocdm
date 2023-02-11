@@ -146,7 +146,7 @@ class SlotAttention(nn.Module):
             self.n_slots, self.slot_size, self.n_iter)
 
 
-class LaternalSlotAttention(SlotAttention):
+class LateralSlotAttention(SlotAttention):
     def __init__(
         self,
         input_size: int,
