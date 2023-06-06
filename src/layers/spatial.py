@@ -39,7 +39,7 @@ class PositionConcat(nn.Module):
         self.dim = dim
 
     def forward(self, inputs):
-        sizes = list(inputs.shape()[:-3]) + [-1, -1, -1]
+        sizes = list(inputs.shape[:-3]) + [-1, -1, -1]
         grid = self.grid.expand(sizes).to(device=inputs.device)
         return torch.cat([inputs, grid], dim=self.dim).contiguous()
 

@@ -8,9 +8,10 @@ learning how they interact.
 
 For more info, the dataset can be found here:
 
-arXiv preprint https://arxiv.org/abs/1906.03292
-NeurIPS Challenge: https://www.aicrowd.com/challenges/
-                           neurips-2019-disentanglement-challenge
+    - arXiv preprint://arxiv.org/abs/1906.03292
+    - NeurIPS Challenge:
+        https://www.aicrowd.com/challenges/neurips-2019-disentanglement-challenge
+
 """
 
 from typing import Callable, Literal, Optional
@@ -61,14 +62,20 @@ class MPI3D(Dataset):
                       'horizontal_axis' : np.arange(40),
                       'vertical_axis'   : np.arange(40)}
 
-    def __init__(self,
-        images: np.ndarray,
-        factor_values: np.ndarray,
-        factor_classes: np.ndarray,
+    def __init__(
+        self,
+        path: str,
+        factor_filter: Optional[Callable],
         version: Literal["real", "simulated", "toy"],
         color_format: Literal["rgb", "hsv"] = "rgb",
         _getter: Optional[Callable] = None,
     ):
+        (
+            images,
+            factor_values,
+            factor_classes
+        ) = self.load_raw(path, factor_filter)
+
         self.images = images
         self.factor_values = factor_values
         self.factor_classes = factor_classes
@@ -124,8 +131,39 @@ class MPI3D(Dataset):
 
         return images, factor_values.astype(np.float32), factor_values
 
+    @staticmethod
+    def get_splits():
+        return {
+            'interp': {},
 
-class _splits:
+            'loo': {
+                'leave1out'  : _masks.leave1out
+            },
+
+            'combgen': {
+                'cyl2hx': _masks.cylinder_to_horizontal_axis,
+                'cyl2vx': _masks.cylinder_to_vertial_axis,
+                'redoc2hx': _masks.redobject2hz,
+                'bkg2cyl': _masks.background_to_cylinder
+            },
+
+            'extrap': {
+                'horz_gt20'  : _masks.exclude_horz_gt20,
+                'objc_gt3'   : _masks.exclude_objc_gt3
+            },
+        }
+
+    @staticmethod
+    def get_modifiers():
+        return {
+            'four_shapes': _masks.remove_redundant_shapes,
+            'fix_hx'     : _masks.fix_hx,
+            'lhalf_hx'   : _masks.lhalf_hx,
+            'even_vx'    : _masks.even_vx
+        }
+
+
+class _masks:
     oc, shp, sz, camh, bkg, hx, vx = 0, 1, 2, 3, 4, 5, 6
 
     # Modifiers
@@ -257,31 +295,3 @@ class _splits:
             return ~test_mask(factor_values, factor_classes)
 
         return train_mask, test_mask
-
-
-splits = {
-    'interp': {},
-
-    'loo': {
-        'leave1out'  : _splits.leave1out
-    },
-
-    'combgen': {
-        'cyl2hx': _splits.cylinder_to_horizontal_axis,
-        'cyl2vx': _splits.cylinder_to_vertial_axis,
-        'redoc2hx': _splits.redobject2hz,
-        'bkg2cyl': _splits.background_to_cylinder
-    },
-
-    'extrap': {
-        'horz_gt20'  : _splits.exclude_horz_gt20,
-        'objc_gt3'   : _splits.exclude_objc_gt3
-    },
-}
-
-modifiers= {
-    'four_shapes': _splits.remove_redundant_shapes,
-    'fix_hx'     : _splits.fix_hx,
-    'lhalf_hx'   : _splits.lhalf_hx,
-    'even_vx'    : _splits.even_vx
-}

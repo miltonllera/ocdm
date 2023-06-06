@@ -1,0 +1,34 @@
+# @package _global_
+
+defaults:
+  - override /dataset: mpi3d
+  - override /model: slot_ae_decoder_control
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "mpi3d", "slot_dec_control", "cylinder_to_vertical_axis"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 64
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: cyl2vx
+  split_modifiers: [four_shapes, lhalf_hx]
+
+trainer:
+  min_epochs: 1
+  max_epochs: 50
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

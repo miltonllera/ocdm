@@ -3,7 +3,8 @@
 defaults:
   - _self_  # override defaults
   - paths: default
-  - hydra: default
+  - analysis: null
+  # - hydra: default
 
 
 task_name: analysis

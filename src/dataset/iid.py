@@ -1,10 +1,10 @@
-from typing import Any, Dict, List, Literal, Optional, Sequence, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, Type, Union
 
 # import numpy as np
 import torch
 import torch.nn as nn
 from pytorch_lightning.core.datamodule import LightningDataModule
-from torch.utils.data import random_split, DataLoader, Subset
+from torch.utils.data import random_split, Dataset, DataLoader, Subset
 
 from .ood_loader import OODLoader
 from .utils import Supervised, Unsupervised
@@ -14,7 +14,7 @@ from .sampler import ImbalancedSampler
 class IIDDataModule(LightningDataModule):
     def __init__(
         self,
-        dataset_name: str,
+        dataset_cls: Type[Dataset],
         path: str,
         split_condition: Optional[str] = None,
         split_variant: Optional[str] = None,
@@ -22,6 +22,7 @@ class IIDDataModule(LightningDataModule):
         setting: Optional[Literal["unsupervised", "supervised"]] = None,
         transform: Optional[nn.Module] = None,
         batch_size: int = 64,
+        eval_batch_size: int = 1,
         num_workers: int = 4,
         split_data: bool = True,
         split_sizes: Sequence[Union[int, float]] = [0.90, 0.05, 0.05],
@@ -40,8 +41,10 @@ class IIDDataModule(LightningDataModule):
             _split_seed = 42
 
         super().__init__()
+        self.dataset_cls = dataset_cls
         self.tranform = transform
         self.batch_size = batch_size
+        self.eval_batch_size = eval_batch_size
         self.num_workers = num_workers
         self.split_data = split_data
         self.split_seed = _split_seed
@@ -57,7 +60,7 @@ class IIDDataModule(LightningDataModule):
         _dataset_params['_getter'] = getter
 
         self.loader = OODLoader(
-            dataset_name,
+            dataset_cls,
             path,
             split_condition,
             split_variant,
@@ -88,8 +91,6 @@ class IIDDataModule(LightningDataModule):
         # print(max_values)
         # print(mean_values)
 
-        # exit()
-
         if stage in ["test", "predict"]:
              self.test_data = dataset
 
@@ -110,7 +111,6 @@ class IIDDataModule(LightningDataModule):
             if len(splits) == 3:
                 self.test_data = splits[2]
 
-
     def train_dataloader(self) -> DataLoader:
         sampler = self.get_sampler(self.train_data)
         return DataLoader(
@@ -120,6 +120,7 @@ class IIDDataModule(LightningDataModule):
             shuffle=sampler is None,
             pin_memory=True,
             sampler=sampler,
+            prefetch_factor=4,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -130,12 +131,26 @@ class IIDDataModule(LightningDataModule):
             shuffle=False,
             pin_memory=True,
             sampler=self.get_sampler(self.val_data),
+            prefetch_factor=4,
         )
 
     def test_dataloader(self) -> DataLoader:
         return DataLoader(
             self.test_data,
-            1,
+            self.eval_batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+            pin_memory=True,
+        )
+
+    def full_dataloader(self) -> DataLoader:
+        """
+        This is useful for some analysis that require loading the full dataset.
+        """
+        dataset = self.loader.load_dataset("all")
+        return DataLoader(
+            dataset,
+            self.eval_batch_size,
             num_workers=self.num_workers,
             shuffle=False,
             pin_memory=True,

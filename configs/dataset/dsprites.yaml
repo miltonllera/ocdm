@@ -2,5 +2,5 @@ defaults:
   - base
   - _self_
 
-dataset_name: dsprites
-path: data/datasets/dsprites/dsprite_train.npz
+dataset_cls: "${get_cls: src.dataset.dsprites.DSprites}"
+path: data/datasets/dsprites/dsprites_train.hdf5

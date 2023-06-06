@@ -9,12 +9,10 @@ defaults:
   # - override /scheduler@model.training.scheduler.reduce_on_plateau: reduce_on_plateau
   - _self_
 
-# all parameters below will be merged with parameters from configurations in
-# the defaults list this allows you to overwrite only specific parameters.
-
-task_name: unsupervised_3dshapes
-
-tags: ["mpi3d", "slate", "cylinder_to_vertical_axis"]
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "mpi3d", "slate", "cylinder_to_vertical_axis"]
 
 seed: null
 
@@ -27,11 +25,13 @@ dataset:
   split_variant: cyl2vx
 
 model:
+  slot:
+    n_slots: 3
   _ar_val_batches: 10
 
 trainer:
   min_epochs: 1
-  max_epochs: 50
+  max_epochs: 100
   gradient_clip_val: 1.0
 
 callbacks:

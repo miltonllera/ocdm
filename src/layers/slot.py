@@ -216,11 +216,11 @@ class SlotDecoder(nn.Sequential):
 
         # batchify reconstruction
         slots = slots.flatten(end_dim=1)
-        atten_weights = atten_weights.flatten(end_dim=1)
 
         if self._pass_slot_only():  # pass attention weights to decoder
             rgba = super().forward(slots)
         else:
+            atten_weights = atten_weights.flatten(end_dim=1)
             rgba = super().forward((slots, atten_weights))
 
         #  shape: (batch_size, n_slots, n_channels + 1, height, width)

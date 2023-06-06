@@ -1,0 +1,45 @@
+# @package _global_
+
+defaults:
+  - override /dataset: supervised_3dshapes  # override avoids conflicts with default config
+  - override /model: ime_no_backbone
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+task_name: supervised_3dshapes
+
+tags: ["dsprites", "ime", "combgen", "shape_and_object_hue"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 64
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: shape2ohue
+  rebalance_wrt_factor: shape
+
+model:
+  n_mechanisms: 6
+  n_targets: [1, 1, 1, 1, 1, 1]
+  target_type: [reg, reg, reg, reg, reg, reg]
+  mechanism_names: [floor_hue, wall_hue, object_hue, scale, shape, orient]
+  encoder_backbone:
+    input_size: [3, 64, 64]
+
+  optimizer:
+    lr: 0.001
+    weight_decay: 0.0
+
+trainer:
+  min_epochs: 1
+  max_epochs: 10
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

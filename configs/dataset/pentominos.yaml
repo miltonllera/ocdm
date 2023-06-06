@@ -1,0 +1,7 @@
+defaults:
+  - base
+  - _self_
+
+dataset_cls: "${get_cls: src.dataset.pentominos.Pentominos}"
+path: "data/datasets/pentominos/dsprites-like"
+num_workers: 6

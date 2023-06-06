@@ -1,9 +1,10 @@
 from typing import Any, Literal, Optional, Callable
 from functools import partial
 
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.multiprocessing as mp
+# import torch.multiprocessing as mp
 from torch.nn.functional import (
     mse_loss,
     log_softmax,
@@ -296,9 +297,16 @@ class HungarianAssignmentLoss(Loss):
         targets = targets.unsqueeze(1).expand(-1, inputs.size(1), -1, -1)
         inputs = inputs.unsqueeze(2).expand(-1, -1, targets.size(2), -1)
 
-        pairwise_cost = self.loss(inputs, targets)
+        pairwise_cost = self.loss(inputs , targets)
 
-        with mp.Pool(10) as p:
-            idx_input, idx_targets = list(zip(p.map(lsa, pairwise_cost)))
+        # with mp.Pool(10) as p:
+        #     assignment = p.map(lsa, pairwise_cost.detach().tolist())
+        assignment = map(lsa, pairwise_cost.detach().tolist())
 
-        return pairwise_cost[torch.arange(B), idx_input, idx_targets].sum() / B
+        idx_input, idx_targets = tuple(zip(*assignment))
+        idx_input = np.array(idx_input)
+        idx_targets = np.array(idx_targets)
+
+        batch_idx = torch.arange(B).unsqueeze_(-1)
+
+        return pairwise_cost[batch_idx, idx_input, idx_targets].sum() / B

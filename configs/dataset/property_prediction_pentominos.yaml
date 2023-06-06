@@ -1,0 +1,11 @@
+defaults:
+  - pentominos
+  - _self_
+
+setting: supervised
+
+_getter_params:
+  target_transform:
+    _target_: src.dataset.transforms.Compose
+    transforms:
+      - "${get_fn: src.dataset.pentominos.shape_prediction}"

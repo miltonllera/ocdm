@@ -1,0 +1,27 @@
+# Format is:
+#  <path-to-folder-and-path-in-config>:: <config-file>
+#
+#  When the path in the config folder and the config differ, we can use:
+#  <path-to-folder>@<path-in-config>: <config-file>
+
+defaults:
+  - base_lgm
+  - /loss@recons_loss: recons_bce
+  - /loss@latent_loss: gaussian_kl
+  - /training: default
+  - _self_
+
+
+_target_: src.model.autoencoder.VariationalAutoEncoder
+
+decoder:
+  _target_: bin.init.parsing.create_sequential
+  input_size: ${model.latent.latent_size}
+  layer_defs:
+    - [spatbroad, [64, 64], {input_last: False}]
+    - [posconcat, [64, 64], {embed: cardinal}]
+    - [conv, [64, 5, 1, 'same']]
+    - [relu]
+    - [conv, [64, 5, 1, 'same']]
+    - [relu]
+    - [conv, ["${model.encoder.input_size.0}", 5, 1, 'same']]

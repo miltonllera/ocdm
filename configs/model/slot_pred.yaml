@@ -1,0 +1,31 @@
+defaults:
+  - /loss: huber
+  - /training: default
+  - /training@training.schedulers.exponential: exponential
+  - /training@training.schedulers.warmup: warmup
+
+_target_: src.model.property_prediction.SlotPropertyPrediction
+
+slot_size: 64
+n_properties: 6
+
+slot_ae:
+  _target_: "${get_fn: bin.init.config.load_model}"
+  run_path: null
+
+prediction_net:
+  _target_: bin.init.parsing.create_sequential
+  input_size: "${model.slot_size}"
+  layer_defs:
+    - [linear, [64]]
+    - [relu]
+    - [linear, ["${model.n_properties}"]]
+
+training:
+  schedulers:
+    exponential:
+      gamma: 0.999986137 # 0.5 ** (1 / 50000)
+    warmup:
+      warmup_steps: 1000
+
+  scheduling_metric: "val/loss"

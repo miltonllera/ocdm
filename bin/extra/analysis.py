@@ -45,12 +45,11 @@ class Analysis:
         # if self.precompute_outputs:
         #     train_output = self.compute_outputs(
 
-        if self.metrics is not None:
+        if len(self.metrics) > 0:
             self.compute_metrics()
 
-        if self.visualisations is not None:
-            self.visualize('train')
-            self.visualize('test')
+        if len(self.visualisations) > 0:
+            self.visualize()
 
     def compute_metrics(self):
         engine = create_supervised_evaluator(self.model, self.metrics)
@@ -65,14 +64,9 @@ class Analysis:
 
         self.logger.log_metrics("metrics", metrics.reset_index())
 
-    def visualize(self, split: str):
-        if split == "train":
-            loader = self.datamodule.train_dataloader()
-        else:
-            loader = self.datamodule.test_dataloader()
-
+    def visualize(self):
         for viz in self.visualisations:
-            figure = viz(self.model, loader, split)
+            figure = viz(self.model, self.datamodule)
             self.logger.log_visualisation(figure)
 
 

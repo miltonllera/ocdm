@@ -1,7 +1,7 @@
 _target_: src.training.loss.WassersteinMMD
 lambda1: 10.0
-lambda2: 1.0
+lambda2: 0.001
 prior_type: norm
-prior_var: 1.0
+prior_var: 2.0
 kernel: null
 lambda_schedule: null

@@ -1,0 +1,40 @@
+# @package _global_
+
+defaults:
+  - override /dataset: mpi3d
+  - override /model: slot_ae_atten_control
+  - override /callbacks: default
+  - override /trainer: gpu
+  # - override /scheduler@model.training.scheduler.exponential: exponential
+  # - override /scheduler@model.training.scheduler.reduce_on_plateau: reduce_on_plateau
+  - _self_
+
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "mpi3d", "slot_attn_control", "cylinder_to_vertical_axis"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 64
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: cyl2vx
+
+model:
+  training:
+    optimizer:
+      lr: 0.0004
+
+trainer:
+  min_epochs: 1
+  max_epochs: 50
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

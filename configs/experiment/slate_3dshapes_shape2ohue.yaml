@@ -5,16 +5,12 @@ defaults:
   - override /model: slate
   - override /callbacks: default
   - override /trainer: gpu
-  - override /scheduler@model.scheduler: exponential
-  # - override /scheduler@model.scheduler: reduce_on_plateau
   - _self_
 
-# all parameters below will be merged with parameters from configurations in
-# the defaults list this allows you to overwrite only specific parameters.
-
-task_name: unsupervised_3dshapes
-
-tags: ["3dshapes", "slate", "shape_to_ohue"]
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "3dshapes", "slate", "shape_to_ohue"]
 
 seed: null
 
@@ -27,17 +23,11 @@ dataset:
   split_variant: shape2ohue
 
 model:
-  optimizer:
-    lr: 0.0003
-  scheduler:
-    gamma: 0.999993069  # 0.5 ** (1 / 100000)
-  scheduler_metric: "val/token_xent"
-
   _ar_val_batches: 10
 
 trainer:
   min_epochs: 1
-  max_epochs: 50
+  max_epochs: 100
   gradient_clip_val: 1.0
 
 callbacks:

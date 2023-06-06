@@ -1,0 +1,40 @@
+# @package _global_
+
+defaults:
+  - override /dataset: pentominos
+  - override /model: slot_ae
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "pentominos", "slot_ae", "half_new_shapes"]
+
+seed: null
+
+test: True
+
+dataset:
+  split_sizes: [0.95, 0.05]
+  split_condition: extrap
+  split_variant: half_new_shapes
+  split_modifiers: [remove_redundant_rotations]
+  rebalance_wrt_factor: shape
+
+model:
+  slot:
+    _target_: src.layers.slot.LateralSlotAttention
+    n_slots: 2
+    approx_implicit_grad: False
+  encoder:
+    input_size: [1, 64, 64]
+
+trainer:
+  max_epochs: 60
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"

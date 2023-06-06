@@ -1,0 +1,14 @@
+defaults:
+  - property_prediction_pentominos_shape_from_shape_and_rotation
+  - _self_
+
+tags: ["supervised", "pentominos", "slot_pred", "rotation_from_shape_and_rotation"]
+
+model:
+  n_properties: 1
+
+_getter_params:
+  target_transform:
+    _target_: src.dataset.transforms.Compose
+    transforms:
+      - "${get_fn: src.dataset.pentominos.rotation_prediction}"

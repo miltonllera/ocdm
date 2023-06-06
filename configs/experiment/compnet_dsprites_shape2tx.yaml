@@ -12,7 +12,10 @@ defaults:
 
 task_name: composition_dsprites
 
-tags: ["dsprites", "composition", "compnet", "shape2tx"]
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["composition", "dsprites", "compnet", "shape2tx"]
 
 seed: null
 

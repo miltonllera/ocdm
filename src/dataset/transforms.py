@@ -12,3 +12,15 @@ class RescaleTargets(nn.Module):
 
     def __call__(self, inputs):
         return (torch.asarray(inputs) - self.mean) / (self.max - self.min)
+
+
+class Compose(nn.Module):
+    def __init__(self, transforms) -> None:
+        super().__init__()
+        self.transforms = transforms
+
+    def __call__(self, inputs):
+        outputs = inputs
+        for transf in self.transforms:
+            outputs = transf(outputs)
+        return outputs

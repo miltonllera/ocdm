@@ -1,0 +1,31 @@
+# @package _global_
+
+defaults:
+  - base
+
+metrics: null
+  # recons_mse:
+  #   _target_: ignite.metrics.MeanSquaredError
+  #   output_transform:
+  #     _target_: bin.extra.utils.create_output_transform
+  #     pred_transform:
+  #       _target_: bin.extra.utils.IndexSelector
+  #       idx: [0, 0]
+
+visualizations:
+  slot_reconstruction:
+    _target_: bin.extra.visualization.SlotReconstruction
+    n_recons: 10
+    data_split: "both"
+
+    recons_extractor:
+      _target_: bin.extra.utils.IndexSelector
+      idx: [0, 0]
+
+    slot_mask_extractor : null
+      # _target_: bin.extra.utils.IndexSelector
+      # idx: [1, 1]
+
+    decoder_mask_extractor:
+      _target_: bin.extra.utils.IndexSelector
+      idx: [0, 1]

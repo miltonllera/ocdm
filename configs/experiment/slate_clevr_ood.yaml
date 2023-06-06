@@ -1,0 +1,39 @@
+# @package _global_
+
+defaults:
+  - override /dataset: clevr
+  - override /model: slate_large
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "clevr", "slate", "ood"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 40
+
+model:
+  slot:
+    n_slots: 7
+  encoder:
+    input_size: [3, 64, 64]
+  training:
+    optimizer:
+      lr: 0.0001
+
+trainer:
+  min_epochs: 1
+  max_epochs: 350
+  gradient_clip_val: 0.05
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

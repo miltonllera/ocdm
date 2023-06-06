@@ -1,0 +1,18 @@
+defaults:
+  - slot_ae
+  - _self_
+
+_target_: src.model.slotae_controls.SlotDecoderControl
+
+decoder:
+  constructor: "${get_cls: torch.nn.Sequential}"
+  input_size: "${prod:${model.slot.slot_size},${model.slot.n_slots}}"
+  layer_defs:
+    - [spatbroad, [8, 8], {input_last: True}]
+    - [posemb2d, {embed: cardinal}]
+    - [permute, [0, 3, 1, 2]]
+    - [tconv, [64, 4, 2, 1]]
+    - [relu]
+    - [tconv, [64, 4, 2, 1]]
+    - [relu]
+    - [tconv, ["${model.encoder.input_size.0}", 4, 2, 1]]

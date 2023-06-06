@@ -1,0 +1,50 @@
+# @package _global_
+
+defaults:
+  - override /dataset: property_prediction_pentominos
+  - override /model: latent_pred
+  - override /callbacks: default
+  - override /trainer: gpu
+  - _self_
+
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["supervised", "pentominos", "latent_pred", "shape_from_shape_and_rotation"]
+
+seed: null
+
+test: True
+
+dataset:
+  batch_size: 512
+  # split_sizes: [0.9, 0.05, 0.05]
+  split_sizes: [0.95, 0.05]
+  split_condition: combgen
+  split_variant: shape_and_rotation
+  split_modifiers: [remove_redundant_rotations]
+  rebalance_wrt_factor: shape
+  _getter_params:
+    pred_type: class
+    target_transform:
+      transforms:
+        - "${get_fn: src.dataset.pentominos.shape_prediction}"
+
+model:
+  n_properties: 12
+  autoencoder:
+    run_path: data/logs/unsupervised/pentominos/wae/shape_and_rotation/2023-04-23_13-22
+
+  training:
+    optimizer:
+      lr: 0.0004
+
+trainer:
+  min_epochs: 1
+  max_epochs: 50
+  gradient_clip_val: 1.0
+
+callbacks:
+  model_checkpoint:
+    mode: "min"
+    monitor: "val/loss"

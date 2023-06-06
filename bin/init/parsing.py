@@ -38,9 +38,11 @@ from .math import *
 
 from src.layers.spatial import (
     PositionConcat,
+    PositionEmbedding1D,
     PositionEmbedding2D,
     SpatialBroadcast,
 )
+from src.layers.scs import SharpenedCosineSimilarity
 
 
 def create_sequential(input_size, layer_defs, constructor=nn.Sequential):
@@ -55,6 +57,8 @@ def create_sequential(input_size, layer_defs, constructor=nn.Sequential):
             layer, output_size = create_linear(output_size, args, kwargs)
         elif layer_type == 'conv':
             layer, output_size = create_conv(output_size, args, kwargs)
+        elif layer_type == 'scs':
+            layer, output_size = create_scs(output_size, args, kwargs)
         elif layer_type == 'tconv':
             layer, output_size = create_tconv(output_size, args, kwargs)
         elif layer_type == 'batch_norm':
@@ -68,18 +72,17 @@ def create_sequential(input_size, layer_defs, constructor=nn.Sequential):
         elif layer_type == 'dropout':
             layer = nn.Dropout2d(*args, **kwargs)
         elif layer_type == 'flatten':
-            layer = nn.Flatten(*args)
-            output_size = compute_flattened_size(output_size,  *args)
+            layer, output_size = create_flatten(output_size, *args)
         elif layer_type == 'unflatten':
-            layer = nn.Unflatten(*args)
-            output_size = args[1]
+            layer, output_size = create_unflatten(output_size, *args)
         elif layer_type == 'upsample':
-            layer = nn.UpsamplingBilinear2d(*args)
-            output_size = (output_size[0], *args[0])
+            layer, output_size = create_upsample(output_size, *args)
         elif layer_type == 'spatbroad':
             layer, output_size = create_spatbroad(output_size, args, kwargs)
+        elif layer_type == 'posemb1d':
+            layer = create_posemb1d(output_size, args, kwargs)
         elif layer_type == 'posemb2d':
-            layer = create_posemb(output_size, args, kwargs)
+            layer = create_posemb2d(output_size, args, kwargs)
         elif layer_type == 'posconcat':
             layer, output_size = create_posconcat(output_size, args, kwargs)
         elif layer_type == 'permute':
@@ -194,6 +197,12 @@ def create_conv(input_size, args, kwargs):
     return layer, output_size
 
 
+def create_scs(input_size, args, kwargs):
+    layer = SharpenedCosineSimilarity(input_size[0], *args, **kwargs)
+    output_size = conv2d_out_shape(input_size, *args)
+    return layer, output_size
+
+
 def create_pixel_shuffle(input_size, args, kwargs):
     upscale_factor = args[0]
     n_channels, height, width = input_size[-3:]
@@ -238,11 +247,17 @@ def create_spatbroad(input_size, args, kwargs):
 def create_posconcat(input_size, args, kwargs):
     layer = PositionConcat(*args, **kwargs)
     output_size = [layer.height, layer.width]
-    output_size.insert(layer.dim, input_size + 2)
+    n_channels = layer.grid.shape[layer.dim]
+    output_size.insert(layer.dim, input_size[layer.dim] + n_channels)
     return layer, output_size
 
 
-def create_posemb(input_size, args, kwargs):
+def create_posemb1d(input_size, args, kwargs):
+    max_len, d_model = input_size
+    return PositionEmbedding1D(max_len, d_model)
+
+
+def create_posemb2d(input_size, args, kwargs):
     height, width, dim_size = input_size
     return PositionEmbedding2D(dim_size, height, width, **kwargs)
 
@@ -263,6 +278,12 @@ class Permute(nn.Module):
 def create_permute(input_size, args, kwargs):
     layer = Permute(args)
     output_size = list(np.array(input_size)[np.asarray(args[1:]) - 1])
+    return layer, output_size
+
+
+def create_upsample(output_size, *args):
+    layer = nn.UpsamplingBilinear2d(*args)
+    output_size = (output_size[0], *args[0])
     return layer, output_size
 
 

@@ -19,7 +19,7 @@ https://twitter.com/ml_4rtemi5
 import torch
 from torch import nn
 import torch.nn.functional as F
-from opt_einsum import contract as einsum
+# from opt_einsum import contract as einsum
 
 
 class SharpenedCosineSimilarity(nn.Module):
@@ -41,6 +41,8 @@ class SharpenedCosineSimilarity(nn.Module):
         self.p = nn.Parameter(torch.empty(out_channels))
         self.weights = nn.Parameter(torch.empty(out_channels, in_channels,
                                                 kernel_size * kernel_size))
+
+        self.reset_parameters()
 
     def reset_parameters(self):
         nn.init.constant_(self.q, 10)
@@ -69,8 +71,8 @@ class SharpenedCosineSimilarity(nn.Module):
         w_norm = norm(self.weights, [1, 2], q, self.eps)
 
         # use contract from opt_einsum
-        # x = torch.einsum('nchwl,vcl->nvhw', x / x_norm, self.w / w_norm)
-        x = einsum('nchwl,vcl->nvhw', x / x_norm, self.w / w_norm)
+        x = torch.einsum('nchwl,vcl->nvhw', x / x_norm, self.weights / w_norm)
+        # x = einsum('nchwl,vcl->nvhw', x / x_norm, self.weights / w_norm)
 
         sign = torch.sign(x)
 

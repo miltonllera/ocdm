@@ -1,6 +1,6 @@
 _target_: src.dataset.iid.IIDDataModule
 
-dataset_name: null
+dataset_cls: null
 path: null
 
 setting: unsupervised

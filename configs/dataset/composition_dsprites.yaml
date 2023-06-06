@@ -3,4 +3,4 @@ defaults:
   - _self_
 
 dataset_name: dsprites
-path: data/datasets/dsprites/dsprite_train.npz
+path: data/datasets/dsprites/dsprites_train.hdf5

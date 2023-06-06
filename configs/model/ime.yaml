@@ -1,0 +1,66 @@
+defaults:
+  - /optimizer: adam
+  - _self_
+
+_target_: src.model.ime.IndependentMechanismEncoder
+
+# Left blank to trigger an error if not set
+n_mechanisms: -1
+
+n_targets: []
+
+target_type: []
+
+mechanism_names: []
+
+hidden_size: 256
+
+# Sharing only the first part of the backbone
+mechanism_encoder:
+  _target_: bin.init.parsing.create_sequential
+  input_size: [32, 16, 16]
+  layer_defs:
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [flatten, [1]]
+    - [linear, [256]]
+    - [relu]
+    - [linear, ["${model.hidden_size}"]]
+    - [relu]
+
+encoder_backbone:
+  _target_: bin.init.parsing.create_sequential
+  input_size: [1, 64, 64]
+  layer_defs:
+    - [conv, [32, 4, 2, 1]]
+    - [relu]
+    - [conv, [32, 4, 2, 1]]
+    - [relu]
+
+
+# Sharing the Convolution part of the backbone
+#
+# mechanism_encoder:
+#   _target_: bin.init.parsing.create_sequential
+#   input_size: 1024
+#   layer_defs:
+#     - [linear, [256]]
+#     - [relu]
+#     - [linear, ["${model.hidden_size}"]]
+#     - [relu]
+
+# encoder_backbone:
+#   _target_: bin.init.parsing.create_sequential
+#   input_size: [1, 64, 64]
+#   layer_defs:
+#     - [conv, [32, 4, 2, 1]]
+#     - [relu]
+#     - [conv, [32, 4, 2, 1]]
+#     - [relu]
+#     - [conv, [64, 4, 2, 1]]
+#     - [relu]
+#     - [conv, [64, 4, 2, 1]]
+#     - [relu]
+#     - [flatten, [1]]

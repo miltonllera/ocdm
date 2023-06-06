@@ -1,0 +1,33 @@
+name: torchlab
+channels:
+- pytorch
+- nvidia
+- conda-forge
+dependencies:
+- python=3.10
+- pip
+- pytorch=1.13.1
+- torchvision=0.14.1
+- cudatoolkit=11.3
+- ignite
+- scikit-learn
+- scikit-image
+- matplotlib
+- seaborn
+- pandas
+- pyyaml
+- mako
+# - cython
+# - fftw
+- pytorch-lightning>=1.8.3
+- pip:
+  - jupyter
+  - sacred
+  - tqdm
+  - h5py
+  - rich
+  - tensorboard
+  - pyrootutils
+  - hydra-core
+  - hydra-colorlog
+  # - fitsne

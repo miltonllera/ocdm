@@ -7,13 +7,10 @@ defaults:
   - override /trainer: gpu
   - _self_
 
-# all parameters below will be merged with parameters from default
-# configurations set above this allows you to overwrite only specified
-# parameters
-
-task_name: unsupervised_dsprites
-
-tags: ["dsprites", "vaes", "combgen", "square_and_position"]
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "dsprites", "vae", "square_to_posX"]
 
 seed: null
 

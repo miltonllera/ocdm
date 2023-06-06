@@ -7,12 +7,10 @@ defaults:
   - override /trainer: gpu
   - _self_
 
-# all parameters below will be merged with parameters from default configurations set above
-# this allows you to overwrite only specified parameters
-
-task_name: unsupervised_mpi3d
-
-tags: ["mpi3d", "slot_ae", "baseline"]
+# Tags format is 'training_regime', 'dataset', 'model', 'condition'
+# This information is used by Hydra to create the run folder
+# See configs/hydra/default.yaml
+tags: ["unsupervised", "mpi3d", "slot_ae", "baseline"]
 
 seed: null
 

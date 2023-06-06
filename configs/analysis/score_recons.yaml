@@ -1,0 +1,14 @@
+# @package _global_
+
+defaults:
+  - base
+
+metrics:
+  recons_mse:
+    _target_: ignite.metrics.MeanSquaredError
+    output_transform:
+      _target_: bin.extra.utils.create_output_transform
+      pred_transform:
+        _target_: bin.extra.utils.IndexSelector
+        # idx: [0, 0]
+        idx: 0

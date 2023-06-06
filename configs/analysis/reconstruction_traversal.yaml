@@ -1,0 +1,19 @@
+# @package _global_
+
+defaults:
+  - base
+
+metrics: null
+
+visualizations:
+  reconstruction_traversal:
+    _target_: bin.extra.visualization.TraversalReconstruction
+    traversal_dim: 2
+    row_dim: 0
+    traversal_samples: 8
+    row_samples: 3
+    recons_transform: mse
+    recons_extractor:
+      _target_: bin.extra.utils.IndexSelector
+      # idx: [0, 0]
+      idx: 0
