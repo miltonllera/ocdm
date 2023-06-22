@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import Any, Literal, Optional, Callable
 from functools import partial
 
@@ -24,6 +25,17 @@ from .math import (
     l2_norm,
     l1_norm,
 )
+
+
+class UpdatableLoss:
+# class UpdatableLoss(metaclass=ABCMeta):
+    # @classmethod
+    # def __subclasshook__(cls, subclass):
+    #     return hasattr(subclass, "update_parameters")
+
+    @abstractmethod
+    def update_parameters(self, *args, **kwargs):
+        raise NotImplementedError
 
 
 class ReconstructionLoss(Loss):
@@ -53,7 +65,7 @@ class ReconstructionLoss(Loss):
         return self.loss_fn(recons, target, reduction="sum") / target.size(0)
 
 
-class GaussianKL(Loss):
+class GaussianKL(Loss, UpdatableLoss):
     """
     This class implements the Variational Autoencoder loss with Multivariate
     Gaussian latent variables. With defualt parameters it is the one described
@@ -64,7 +76,11 @@ class GaussianKL(Loss):
     Basic Visual Concepts with a Constrained Variational Framework",
     Higgins et al., (2017) [https://openreview.net/forum?id=Sy2fzU9gl]
     """
-    def __init__(self, beta=1.0, beta_schedule=None):
+    def __init__(
+        self,
+        beta: float = 1.0,
+        beta_schedule: tuple[int, str, float] | None = None
+    ):
         super().__init__()
         self.beta = beta
         self.beta_schedule = beta_schedule
@@ -88,7 +104,7 @@ class GaussianKL(Loss):
                 self.anneal = min(min_anneal + delta * step, 1.0)
 
 
-class WassersteinAdversarial(Loss):
+class WassersteinAdversarial(Loss, UpdatableLoss):
     """
     Class that implements the adversarial version of the Wasserstein loss
     as found in "Wasserstein Autoencoders" Tolstikhin et al., 2019
@@ -100,12 +116,12 @@ class WassersteinAdversarial(Loss):
     trained with conjugate gradient descent.
     """
     def __init__(self,
-         lambda1=10.0,
-         lambda2=0.0,
-         prior_var=1.0,
-         lmbda_schedule=None,
-         discriminator: Optional[nn.Module] = None,
-         optimizer: Optional[Callable[[Any], Optimizer]] = None
+        lambda1: float = 10.0,
+        lambda2: float = 0.0,
+        prior_var: float = 1.0,
+        lmbda_schedule: tuple[int, float] | None = None,
+        discriminator: nn.Module | None = None,
+        optimizer: Callable[[Any], Optimizer] | None = None
      ):
         super().__init__()
         self.lambda1 = lambda1
@@ -200,7 +216,7 @@ class WassersteinAdversarial(Loss):
         self.optim.step()
 
 
-class WassersteinMMD(Loss):
+class WassersteinMMD(Loss, UpdatableLoss):
     """
     Class that implements the Minimum Mean Discrepancy term in the latent space
     as found in "Wasserstein Autoencoders", Tolstikhin et al., (2019)
@@ -216,10 +232,10 @@ class WassersteinMMD(Loss):
     """
     def __init__(
         self,
-        lambda1=10,
-        lambda2=1.0,
-        prior_type='norm',
-        prior_var=1.0,
+        lambda1: float = 10.0,
+        lambda2: float = 1.0,
+        prior_type: str ='norm',
+        prior_var: float = 1.0,
         kernel=None,
         lambda_schedule=None
     ):
@@ -281,7 +297,7 @@ class ImageTokenLoss(Loss):
 
 
 class HungarianAssignmentLoss(Loss):
-    def __init__(self, loss='huber'):
+    def __init__(self, loss: str = 'huber'):
         super().__init__(reduction='batchmean')
         if loss == 'huber':
             loss = huber_norm
@@ -289,6 +305,9 @@ class HungarianAssignmentLoss(Loss):
             loss = l2_norm
         elif loss == 'l1':
             loss = l1_norm
+        else:
+            raise RuntimeError("Unrecognized loss")
+
         self.loss = loss
 
     def forward(self, inputs, targets):

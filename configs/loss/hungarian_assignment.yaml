@@ -1,2 +1,0 @@
-_target_: src.training.loss.HungarianAssignmentLoss
-loss: huber

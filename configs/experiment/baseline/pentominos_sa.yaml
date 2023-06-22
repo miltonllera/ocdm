@@ -1,0 +1,87 @@
+# @package _global_
+
+# Basic settings
+condition_name: baseline_pentominos
+model_name: sa
+test: true
+
+# Dataset configuration
+dataset:
+  _target_: src.dataset.pentominos.Pentominos
+  path: data/datasets/pentominos/
+  prediction_type: unsupervised
+  held_out_filter: null
+  # Performance stuff
+  # num_worker: 4
+  # val_split: 0.2
+
+# Model configuration
+model:
+  _target_: src.model.grouping.FigureGroundAutoencoder
+  input_size: [1, 64, 64]  # channels, height, width (assuming grayscale, will adapt based on data)
+
+  # Encoder layers configuration
+  encoder_config:
+    - [conv, [32, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [permute, [0, 2, 3, 1]]
+    - [posemb2d, {embed: cardinal}]
+    - [flatten, [1, 2]]
+    - [layer_norm, [-1]]
+    - [linear, [64]]
+    - [relu]
+
+  # Decoder layers configuration
+  decoder_config:
+    - [spatbroad, [8, 8], {input_last: True}]  # Spatial broadcast to 8x8
+    - [posemb2d, {embed: cardinal}]
+    - [permute, [0, 3, 1, 2]]
+    - [tconv, [64, 4, 2, 1]]
+    - [relu]
+    - [tconv, [64, 4, 2, 1]]
+    - [relu]
+    - [tconv, [2, 4, 2, 1]]    # Output 1 channel (grayscale) + mask
+
+  # Slot Attention parameters
+  slot_size: 10
+  n_iter: 3
+  slot_channels: 1
+  slot_hidden_size: 128
+  approx_implicit_grad: true
+
+# Training configuration
+training:
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: 0.0003
+
+  schedulers:
+    exponential:
+      _target_: src.training.scheduler.ExponentialLR
+      _partial_: true
+      gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
+      decay_groups: null
+    warmup:
+      _target_: src.training.scheduler.WarmupLR
+      _partial_: true
+      start_value: 0.0
+      warmup_steps: 3000
+
+  scheduling_metric: val/loss
+
+# Trainer configuration
+trainer:
+  _target_: lightning.pytorch.Trainer
+  max_steps: 100_000
+  gradient_clip_val: 1.0
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 10
+  val_check_interval: 5000
+  check_val_every_n_epoch: null
+  fast_dev_run: false
+  default_root_dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}

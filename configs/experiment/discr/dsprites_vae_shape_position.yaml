@@ -1,0 +1,54 @@
+# @package _global_
+
+condition_name: dsprites_vae
+model_name: discriminator
+test: true
+
+# Dataset configuration
+dataset:
+  _target_: src.dataset.dsprites.DSprites
+  path: data/datasets/dsprites/dsprites_train.hdf5
+  prediction_type: classification
+  val_split: 0.2
+
+# Model configuration
+model:
+  _target_: src.model.regression.AdversarialDiscriminator
+  input_size: [1, 64, 64]  # channels, height, width (assuming grayscale, will adapt based on data)
+  model_class: ${get_cls:src.model.autoencoder.BetaVAE}
+  model_ckpt: "data/results/figure1/combgen_dsprites_heart_position_vae_on:2025-11-12_13-45/epoch=490-step=471360.ckpt" # ToDo: find baseline VAE model
+
+  # Encoder layers configuration
+  backbone_config:
+    - [conv, [32, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
+    - [relu]
+    - [conv, [32, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [permute, [0, 2, 3, 1]]
+    - [flatten, [1]]
+    - [layer_norm, [-1]]
+    - [linear, [256]]
+    - [relu]
+
+# Training configuration
+training:
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: 0.0003
+
+# Trainer configuration
+trainer:
+  _target_: lightning.pytorch.Trainer
+  max_steps: 50_000
+  gradient_clip_val: 1.0
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 10
+  val_check_interval: 5000
+  check_val_every_n_epoch: null
+  fast_dev_run: false
+  default_root_dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}

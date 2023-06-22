@@ -1,26 +1,33 @@
 # @package _global_
 
 defaults:
-  - _self_  # override defaults
-  - dataset: null
-  - model: null
-  - callbacks: dafault
-  - logger: tensorboard
-  - trainer: dafault
-  - paths: default
-  - hydra: default
-
-  # Set an experiment with all the above set to specific values
+  - _self_
   - experiment: null
+  - override hydra/hydra_logging: colorlog
+  - override hydra/job_logging: colorlog
 
-  # Hyperparemeter optimization
-  - hparams_search: null
+paths:
+  # path to root directory
+  # this requires PROJECT_ROOT environment variable to exist
+  # PROJECT_ROOT is inferred and set by pyrootutils package in `train.py` and `eval.py`
+  root_dir: ${oc.env:PROJECT_ROOT}
 
+  # path to data directory
+  data_dir: ${paths.root_dir}/data/
 
-task_name: train
+  # path to logging directory
+  log_dir: ${paths.root_dir}/data/logs/
 
-tags: ["dev"]
+  # path to output directory, created dynamically by hydra
+  # path generation pattern is specified in `configs/hydra/default.yaml`
+  # use it to store all files generated during the run, like ckpts and metrics
+  output_dir: ${hydra:runtime.output_dir}
 
-seed: null
+  # path to working directory
+  work_dir: ${hydra:runtime.cwd}
 
-ckpt_path: null  # path to resume training
+hydra:
+  run:
+    dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
+  sweep:
+    dir: ${paths.log_dir}/multiruns/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}

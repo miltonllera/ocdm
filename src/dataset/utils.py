@@ -1,82 +1,52 @@
+import re
 import numpy as np
-from torch.utils.data.dataset import Dataset
 
 
-class class_property:
-    def __init__(self, getter) -> None:
-        super().__init__()
-        self.getter = getter
+def build_filter(dataset, expr: str):
+    """
+    Build a lambda that evaluates a boolean expression over feature vectors.
 
-    def __get__(self, instance, owner):
-        return self.getter(owner)
+    Example:
+        build_lambda("shape == 1 & color != 2", ["shape", "color"])
+        → lambda x: ( x[:, 0] == 1 ) & ( x[:, 1] != 2 )
+    """
+    assert hasattr(dataset, 'factors')
+    properties = dataset.factors
+    prop_to_idx = {p: i for i, p in enumerate(properties)}
 
+    # Pattern to find property names as whole words
+    pattern = r"\b(" + "|".join(map(re.escape, properties)) + r")\b"
 
-class Supervised:
-    def __init__(self, pred_type='reg', dim=None, target_transform=None):
-        self.pred_type = pred_type
-        self.dim = dim
-        self.target_transform = target_transform
+    # Replace each property with x[index]
+    def replace_prop(match):
+        prop = match.group(1)
+        return f"x[:, {prop_to_idx[prop]}]"
 
-    def __call__(self, image, factor_values, factor_classes):
-        if self.pred_type == "class":
-            target = factor_classes.astype(np.int32)
-        else:
-            target = factor_values.astype(np.float32)
+    transformed_expr = re.sub(pattern, replace_prop, expr)
 
-        if self.dim is not None:
-            target = target[self.dim]
+    safe_env = {"np": np}
+    lambda_str = f"lambda x: {transformed_expr}"
+    # print(lambda_str)
+    # exit()
+    func = eval(lambda_str, safe_env)
 
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-
-        return image, target
-
-
-class Unsupervised:
-    def __call__(self, image, factor_values, factor_classes):
-        return image, image
+    return func
 
 
-class DatasetWrapper(Dataset):
-    def __init__(self, base_dataset):
-        self.dataset = base_dataset
+# if __name__ == "__main__":
+#     from itertools import product
 
-    def __len__(self):
-        return len(self.dataset)
-        # return self.n_samples
+#     class dummy_dataset:
+#         factors = ('shape', 'scale')
 
-    @property
-    def n_factors(self):
-        return len(self.factor_sizes)
+#         def __init__(self) -> None:
+#             shape = np.array([1., 2., 3.])
+#             scale = np.array([0.5, 0.6, 0.7, 0.8, 0.9, 1.])
+#             self.factor_values = np.asarray(list(product(shape, scale)))
 
-    @property
-    def factor_sizes(self):
-        return self.dataset.factor_sizes
 
-    @property
-    def img_size(self):
-        return self.dataset.img_size
+#     data = dummy_dataset()
+#     print(data.factor_values)
+#     filter_fn = build_filter(data, "( shape ==  1 ) & ( scale > 0.6 )")
+#     print(filter_fn(data.factor_values))
 
-    @property
-    def factors(self):
-        return self.dataset.factors
-
-    @property
-    def factor_code(self):
-        return self.dataset.factor_classes
-
-    @property
-    def factor_values(self):
-        return self.dataset.factor_values
-
-    @property
-    def images(self):
-        return self.dataset.images
-
-    @property
-    def transform(self):
-        return self.dataset.transform
-
-    @property
-    def categorical(self):
-        return self.dataset.categorical

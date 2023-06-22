@@ -1,6 +1,0 @@
-defaults:
-  - base
-  - _self_
-
-dataset_cls: "${get_cls: src.dataset.dsprites.DSprites}"
-path: data/datasets/dsprites/dsprites_train.hdf5

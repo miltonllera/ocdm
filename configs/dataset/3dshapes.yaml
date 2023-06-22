@@ -1,9 +1,0 @@
-defaults:
-  - base
-  - _self_
-
-dataset_cls: "${get_cls: src.dataset.shapes3d.Shapes3D}"
-path: data/datasets/shapes3d/3dshapes.h5
-
-_dataset_params:
-  color_format: rgb

@@ -1,0 +1,83 @@
+# @package _global_
+
+# Basic settings
+condition_name: combgen_dsprites_heart_position
+model_name: vae
+test: true
+
+# Dataset configuration
+dataset:
+  _target_: src.dataset.dsprites.DSprites
+  path: data/datasets/dsprites/dsprites_train.hdf5
+  batch_size: 64
+  held_out_filter: "( shape == 3 ) & ( posX < 0.5 )"  # NOTE: parenthesis are important
+  rebalance_dim: shape
+
+  # Performance stuff
+  # num_worker: 4
+  # val_split: 0.2
+
+# Model configuration
+model:
+  _target_: src.model.autoencoder.BetaVAE
+  input_size: [1, 64, 64]  # channels, height, width
+
+  # Encoder layers configuration
+  encoder_config:
+    - [conv, [32, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
+    - [relu]
+    - [conv, [32, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [flatten]
+    - [linear, [256]]
+    - [relu]
+
+  # Decoder layers configuration
+  decoder_config:
+    - [linear, [256]]
+    - [relu]
+    - [unflatten, [1, [16, 4, 4]]]
+    - [tconv, [64, 4, 2, 1]]
+    - [relu]
+    - [tconv, [32, 4, 2, 1]]
+    - [relu]
+    - [tconv, [32, 4, 2, 1]]
+    - [relu]
+    - [tconv, ["${model.input_size.0}", 4, 2, 1]]
+
+  # VAE parameters
+  latent_size: 10
+  beta: 1.0
+
+# Training configuration
+training:
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: 0.001
+    weight_decay: 0.0
+
+  schedulers:
+    warmup:
+      _target_: torch.optim.lr_scheduler.LinearLR
+      start_factor: 0.1
+      total_iters: 1000
+
+  scheduling_metric: val/loss
+
+# Trainer configuration
+trainer:
+  _target_: lightning.pytorch.Trainer
+  max_steps: 500_000
+  gradient_clip_val: 1.0
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 10
+  check_val_every_n_epoch: null
+  val_check_interval: 5000
+  fast_dev_run: false
+  default_root_dir: ${paths.log_dir}/figure1/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
+

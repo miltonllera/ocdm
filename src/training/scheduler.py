@@ -3,8 +3,7 @@ from torch.optim.lr_scheduler import _LRScheduler
 
 
 class WarmupLR(_LRScheduler):
-    def __init__(self, optimizer, start_value, warmup_steps, warmup_groups=None,
-                 last_epoch=-1, verbose=False):
+    def __init__(self, optimizer, start_value, warmup_steps, warmup_groups=None, last_epoch=-1):
         self.base_lr = np.array([g['lr'] for g in optimizer.param_groups])
         self.start_value = start_value
         self.warmup_steps = warmup_steps
@@ -14,7 +13,7 @@ class WarmupLR(_LRScheduler):
 
         self.warmup_groups = warmup_groups
 
-        super().__init__(optimizer, last_epoch, verbose)
+        super().__init__(optimizer, last_epoch)
 
     def step_value(self, i):
         slope = (self.base_lr[i] - self.start_value) / self.warmup_steps
@@ -33,11 +32,10 @@ class WarmupLR(_LRScheduler):
 
 
 class ExponentialLR(_LRScheduler):
-    def __init__(self, optimizer, gamma, decay_groups, last_epoch=-1,
-                 verbose=False):
+    def __init__(self, optimizer, gamma, decay_groups=None, last_epoch=-1):
         self.gamma = gamma
         self.decay_groups = decay_groups
-        super().__init__(optimizer, last_epoch, verbose)
+        super().__init__(optimizer, last_epoch)
 
     def get_gamma(self, i):
         if self.decay_groups is None or i in self.decay_groups:

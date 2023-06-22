@@ -21,42 +21,39 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms as trans
 
-from .utils import class_property
-
 
 class Pentominos(Dataset):
     n_factors = 6
-
     factors = ('shape', 'color', 'scale', 'angle', 'pos_x', 'pos_y')
 
     def __init__(
         self,
         path: str,
-        factor_filter: Optional[Callable],
-        _getter: Optional[Callable] = None,
+        prediction_type: str = 'unsupervised',
+        held_out_filter: Callable = None,
     ) -> None:
         (
             image_files,
             factor_values,
             factor_classes
-        ) = self.load_raw(path, factor_filter)
+        ) = self.load_raw(path, held_out_filter)
 
         self.image_files = image_files
         self.factor_values = factor_values
         self.factor_classes = factor_classes
         self.transform = trans.ToTensor()
-        self._getter = _getter
+        self.prediction_type = prediction_type
 
     def __len__(self):
         return len(self.image_files)
 
     def __getitem__(self, index):
         image = self.load_image(self.image_files[index])
-        data = image, self.factor_values[index], self.factor_classes[index]
-
-        if self._getter is None:
-            return data
-        return self._getter(*data)
+        if self.prediction_type == 'unsupervised':
+            return image, image
+        elif self.prediction_type == 'classification':
+            return image, self.factor_classes[index].astype(np.int64)
+        return image, self.factor_values[index]
 
     def load_image(self, path):
         image = self.transform(Image.open(path))
@@ -85,11 +82,6 @@ class Pentominos(Dataset):
 
         n_values = tuple(len(fv) for fv in meta['unique_values'].values())
 
-        factor_values = np.array(factor_values, dtype=np.float32)
-        factor_classes = np.asarray(
-            list(product(*[range(i) for i in n_values])), dtype=np.int32
-        )
-
         # Set meta values
         img_size = (
             3 if (len(meta['unique_values']['colors']) > 1) else 1,
@@ -97,14 +89,22 @@ class Pentominos(Dataset):
             meta['width']
         )
 
+        factor_values = np.array(factor_values, dtype=np.float32)
+        factor_classes = list(product(*[range(i) for i in n_values]))
+
+        if n_values[-1] > 1 and n_values[1] > 1:  # more than one background color
+            factor_classes = [c for c in factor_classes if c[-1] != c[1]]
+        factor_classes = np.asarray(factor_classes, dtype=np.float32)
+
         # This is a complete anti-pattern that should not be used ever
         Pentominos.unique_values = meta['unique_values']
         Pentominos.img_size = img_size
         Pentominos.factor_sizes = n_values
+        Pentominos.shape_names = np.asarray([s for s in meta['shape_names'].values()])
 
         # Remove excluded values
         if factor_filter is not None:
-            idx = factor_filter(factor_values, factor_classes)
+            idx = factor_filter(factor_values)
 
             image_files = [image_files[i] for i in idx.nonzero()[0]]
             factor_values = factor_values[idx]
@@ -117,25 +117,8 @@ class Pentominos(Dataset):
 
         return image_files, factor_values, factor_classes
 
-
-    @staticmethod
-    def get_splits():
-        return {
-            'combgen': {
-                'shape_and_rotation': _masks.shape_and_rotation,
-            },
-            'extrap': {
-                'new_shape': _masks.new_shape,
-                'three_new_shapes': _masks.three_new_shapes,
-                'half_new_shapes': _masks.half_new_shapes,
-            }
-        }
-
-    @staticmethod
-    def get_modifiers():
-        return {
-            'remove_redundant_rotations': _masks.remove_redundant_rotations,
-        }
+    def map_shapes(self, values):
+        return type(self).shape_names[values.astype(int)]
 
 
 class FixedRotationPentominos(Pentominos):
@@ -143,7 +126,6 @@ class FixedRotationPentominos(Pentominos):
         self,
         path: str,
         factor_filter: Optional[Callable],
-        _getter: Optional[Callable] = None
     ) -> None:
         (
             target_images,
@@ -158,11 +140,10 @@ class FixedRotationPentominos(Pentominos):
         total_combs = np.prod(self.factor_sizes)
         self.code_bases = total_combs / np.cumprod(self.factor_sizes)
 
-        super().__init__(path, factor_filter,  _getter=None)
+        super().__init__(path, factor_filter)
 
     def __getitem__(self, index):
         image, _, input_classes = super().__getitem__(index)
-
         target_fv = input_classes.copy()
         # since rotation values are 9 degrees apart, 5 values is 45 degrees
         target_fv[3] = (target_fv[3] + 5) % self.factor_sizes[3]
@@ -184,72 +165,3 @@ def rotation_prediction(targets: np.ndarray) -> np.ndarray:
     object_rotation[0] = targets[3]
     return object_rotation[None]
 
-
-class _masks:
-    shp, hue, scl, rot, tx, ty = 0, 1, 2, 3, 4, 5
-
-    @class_property
-    def remove_redundant_rotations(cls):
-        def modifier(factor_values, factor_classes):
-            i_rotations = (
-                (factor_values[:, cls.shp] == 0) &
-                (factor_values[:, cls.rot] < 180)
-            )
-
-            x_rotations = (
-                (factor_values[:, cls.shp] == 9) &
-                (factor_values[:, cls.rot] < 90)
-            )
-
-            z_rotations = (
-                (factor_values[:, cls.shp] == 11) &
-                (factor_values[:, cls.rot] < 180)
-            )
-
-            rest = ~np.isin(factor_values[:, cls.shp], [0, 9, 11])
-
-            return i_rotations | z_rotations | x_rotations | rest
-
-        return modifier
-
-    @class_property
-    def shape_and_rotation(cls):
-        def test_mask(factor_values, factor_classes):
-            excluded_shapes = np.isin(factor_values[:, cls.shp], [1, 3, 5, 8])
-            excluded_angles = factor_values[:, cls.rot] < 180
-            return excluded_shapes & excluded_angles
-
-        def train_mask(factor_values, factor_classes):
-            return ~test_mask(factor_values, factor_classes)
-
-        return train_mask, test_mask
-
-    @class_property
-    def new_shape(cls):
-        def test_mask(factor_values, factor_classes):
-            return factor_values[:, cls.shp] == 8
-
-        def train_mask(factor_values, factor_classes):
-            return ~test_mask(factor_values, factor_classes)
-
-        return train_mask, test_mask
-
-    @class_property
-    def three_new_shapes(cls):
-        def test_mask(factor_values, factor_classes):
-            return np.isin(factor_values[:, cls.shp], [3, 5, 8])
-
-        def train_mask(factor_values, factor_classes):
-            return ~test_mask(factor_values, factor_classes)
-
-        return train_mask, test_mask
-
-    @class_property
-    def half_new_shapes(cls):
-        def test_mask(factor_values, factor_classes):
-            return np.isin(factor_values[:, cls.shp], [1, 3, 4, 5, 7, 8])
-
-        def train_mask(factor_values, factor_classes):
-            return ~test_mask(factor_values, factor_classes)
-
-        return train_mask, test_mask

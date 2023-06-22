@@ -1,5 +1,5 @@
 import torch
-import pandas as pd
+import polars as pl
 from torch.utils.data.sampler import Sampler
 
 
@@ -14,14 +14,16 @@ class ImbalancedSampler(Sampler):
         self.num_samples = len(self.indices)
 
         # distribution of classes in the dataset
-        df = pd.DataFrame()
-        df["label"] =  labels
-        df.index = pd.Index(self.indices)
-        df.sort_index(inplace=True)
+        df = pl.DataFrame({ "index": self.indices, "label": labels }).sort("index")
 
-        label_to_count = df["label"].value_counts()
+        # Count occurrences of each label
+        label_counts = df.group_by("label").agg(pl.count().alias("count"))
 
-        weights = 1.0 / label_to_count[df["label"]]
+        # Join counts back to the original dataframe
+        df = df.join(label_counts, on="label")
+
+        # Calculate weights as inverse of counts
+        weights = 1.0 / df["count"]
 
         self.weights = torch.DoubleTensor(weights.to_list())
 

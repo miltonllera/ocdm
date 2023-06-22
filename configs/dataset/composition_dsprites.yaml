@@ -1,6 +1,0 @@
-defaults:
-  - comp_base
-  - _self_
-
-dataset_name: dsprites
-path: data/datasets/dsprites/dsprites_train.hdf5

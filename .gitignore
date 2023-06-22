@@ -1,5 +1,7 @@
 __pycache__
 data/*/
+.claude/
 plots/
 train.log
 *.log
+pyrightconfig.json
