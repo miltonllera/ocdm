@@ -3,3 +3,4 @@ data/*/
 plots/
 train.log
 *.log
+pyrightconfig.json

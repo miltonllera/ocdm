@@ -1,3 +1,4 @@
+from abc import abstractmethod
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,6 +13,14 @@ class CompositionOp(nn.Module):
 
         self.latent_size = latent_size
         self.n_actions = n_actions
+
+    @abstractmethod
+    def __call__(
+        self,
+        inputs: torch.Tensor,
+        actions: torch.Tensor
+    ) -> torch.Tensor:
+        pass
 
 
 class SoftmaxComp(CompositionOp):
@@ -81,9 +90,12 @@ class MLPComp(CompositionOp):
     def __init__(self, latent_size, n_actions):
         super().__init__(latent_size, n_actions)
         input_size = 2 * latent_size + n_actions
-        self.projection = nn.Sequential(nn.Linear(input_size, 128),
-                                        nn.ReLU(),
-                                        nn.Linear(128, latent_size))
+
+        self.projection = nn.Sequential(
+            nn.Linear(input_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, latent_size)
+        )
 
     def forward(self, z, actions):
         zpa = torch.cat([z.reshape(-1, self.latent_size), actions], dim=1)
