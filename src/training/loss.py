@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import Any, Literal, Optional, Callable
 from functools import partial
 
@@ -24,6 +25,17 @@ from .math import (
     l2_norm,
     l1_norm,
 )
+
+
+class UpdatableLoss:
+# class UpdatableLoss(metaclass=ABCMeta):
+    # @classmethod
+    # def __subclasshook__(cls, subclass):
+    #     return hasattr(subclass, "update_parameters")
+
+    @abstractmethod
+    def update_parameters(self, *args, **kwargs):
+        raise NotImplementedError
 
 
 class ReconstructionLoss(Loss):
@@ -53,7 +65,7 @@ class ReconstructionLoss(Loss):
         return self.loss_fn(recons, target, reduction="sum") / target.size(0)
 
 
-class GaussianKL(Loss):
+class GaussianKL(Loss, UpdatableLoss):
     """
     This class implements the Variational Autoencoder loss with Multivariate
     Gaussian latent variables. With defualt parameters it is the one described
@@ -88,7 +100,7 @@ class GaussianKL(Loss):
                 self.anneal = min(min_anneal + delta * step, 1.0)
 
 
-class WassersteinAdversarial(Loss):
+class WassersteinAdversarial(Loss, UpdatableLoss):
     """
     Class that implements the adversarial version of the Wasserstein loss
     as found in "Wasserstein Autoencoders" Tolstikhin et al., 2019
@@ -200,7 +212,7 @@ class WassersteinAdversarial(Loss):
         self.optim.step()
 
 
-class WassersteinMMD(Loss):
+class WassersteinMMD(Loss, UpdatableLoss):
     """
     Class that implements the Minimum Mean Discrepancy term in the latent space
     as found in "Wasserstein Autoencoders", Tolstikhin et al., (2019)

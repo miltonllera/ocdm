@@ -19,7 +19,7 @@ class BaseModel(pl.LightningModule, ABC):
         """
         Computes and chains outputs from all modules in the model.
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def _step(self, batch, batch_idx, phase):
@@ -30,7 +30,7 @@ class BaseModel(pl.LightningModule, ABC):
         train/validation/test steps to add functionality like computing extra
         metrics or adding visulizations.
         """
-        pass
+        raise NotImplementedError
 
     def configure_optimizers(self) -> OPTIMIZATION_CONFIG:
         return self.training_init.initialize(self.parameters())

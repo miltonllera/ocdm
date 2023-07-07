@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from src.layers.initialization import weights_init
-from src.training.loss import ReconstructionLoss
+from src.training.loss import ReconstructionLoss, UpdatableLoss
 from .base import BaseModel, TrainingInit
 
 
@@ -52,7 +52,7 @@ class VariationalAutoEncoder(BaseModel):
         phase: Literal["train", "val", "test"]
     ):
         is_train = phase == "train"
-        if is_train and hasattr(self.latent_loss, "update_parameters"):
+        if is_train and isinstance(self.latent_loss, UpdatableLoss):
             self.latent_loss.update_parameters(self.global_step)
 
         inputs, targets = batch

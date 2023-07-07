@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.nn.modules.container import ModuleList
 
 from src.layers.initialization import weights_init
-from .base import BaseModel, OptimizerInit, SchedulerInit
+from src.model.base import BaseModel, TrainingInit
 
 
 class IndependentMechanismEncoder(BaseModel):
@@ -19,11 +19,10 @@ class IndependentMechanismEncoder(BaseModel):
         encoder_backbone: nn.Sequential,
         # regression_loss: nn.Module,
         # categorical_loss: nn.Module,
-        optimizer: OptimizerInit,
-        scheduler: SchedulerInit = None,
+        training: TrainingInit,
         mechanism_names: Optional[List[str]] = None,
     ) -> None:
-        super().__init__(optimizer, scheduler)
+        super().__init__(training)
 
         assert n_mechanisms > 0
         assert len(n_targets) == n_mechanisms == len(target_type)

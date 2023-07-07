@@ -45,38 +45,10 @@ class DatasetWrapper(Dataset):
         return len(self.dataset)
         # return self.n_samples
 
-    @property
-    def n_factors(self):
-        return len(self.factor_sizes)
-
-    @property
-    def factor_sizes(self):
-        return self.dataset.factor_sizes
-
-    @property
-    def img_size(self):
-        return self.dataset.img_size
-
-    @property
-    def factors(self):
-        return self.dataset.factors
-
-    @property
-    def factor_code(self):
-        return self.dataset.factor_classes
-
-    @property
-    def factor_values(self):
-        return self.dataset.factor_values
-
-    @property
-    def images(self):
-        return self.dataset.images
-
-    @property
-    def transform(self):
-        return self.dataset.transform
-
-    @property
-    def categorical(self):
-        return self.dataset.categorical
+    def __getattr__(self, name):
+        '''
+        Used to directly access dataset properties (eg. self.latent_factors)
+        '''
+        if hasattr(self, name):
+            return hasattr
+        return self.dataset.__getattr__(name)
