@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from src.training.loss import ReconstructionLoss
-from src.layers.composition import CompositionOp
+from src.layers.composition import CompositionOp, SlotComposition
 from src.layers.slot import SlotAttention, SlotDecoder
 
 from .base import BaseModel, TrainingInit
@@ -98,7 +98,7 @@ class ObjectCentricCompositionNet(BaseModel):
         slot: SlotAttention,
         decoder: SlotDecoder,
         slot_selector: nn.Sequential,
-        composition_op: CompositionOp,
+        composition_op: SlotComposition,
         recons_loss: ReconstructionLoss,
         training: TrainingInit,
     ):
@@ -122,30 +122,32 @@ class ObjectCentricCompositionNet(BaseModel):
         h = self.encoder(inputs)
         slots, _ = self.slot(h)
 
-        slots_og, slots_tr = slots.unflatten(0, (B, Ni)).chunk(Ni, dim=1)
+        # slots_og, slots_tr = slots.unflatten(0, (B, Ni)).chunk(Ni, dim=1)
         # slot_masks_og, slot_masks_tr = slots.unflatten(0, (B, Ni)).chunk(Ni, dim=1)
 
-        selected_og, other_og, _ = self.select_slot(slots_og, actions)  # first is the selected one
-        selected_tr, _, _ = self.select_slot(slots_tr, actions)
+        # selected_og, other_og, _ = self.select_slot(slots_og, actions)  # first is the selected one
+        # selected_tr, _, _ = self.select_slot(slots_tr, actions)
 
-        selected_slot = torch.cat((selected_og, selected_tr), dim=1)
+        # selected_slot = torch.cat((selected_og, selected_tr), dim=1)
 
-        transformed_slot = self.composition_op(selected_slot, actions)
-        new_slots = torch.cat((transformed_slot, other_og), dim=1)
+        # transformed_slot = self.composition_op(selected_slot, actions)
+        # new_slots = torch.cat((transformed_slot, other_og), dim=1)
+
+        new_slots = self.composition_op(slots.unflatten(0, (B, Ni)), actions)
 
         all_slots = torch.cat((slots, new_slots), dim=0)
         recons = self.decoder(all_slots).unflatten(0, (B, Ni + 1))
 
         return recons, new_slots
 
-    def select_slot(self, slots, actions):
-        actions = actions.unsqueeze(1).expand(-1, self.slot.n_slots, -1)
-        slot_and_actions = torch.cat((slots, actions), dim=-1)
+    # def select_slot(self, slots, actions):
+    #     actions = actions.unsqueeze(1).expand(-1, self.slot.n_slots, -1)
+    #     slot_and_actions = torch.cat((slots, actions), dim=-1)
 
-        slot_probs = F.softmax(self.slot_selector(slot_and_actions), dim=1)
-        sorted_slots, idx = slot_probs.sort(dim=1, descending=True)
+    #     slot_probs = F.softmax(self.slot_selector(slot_and_actions), dim=1)
+    #     sorted_slots, idx = slot_probs.sort(dim=1, descending=True)
 
-        return sorted_slots[:, :1], sorted_slots[:, 1:], idx
+    #     return sorted_slots[:, :1], sorted_slots[:, 1:], idx
 
     def _step(self, batch, batch_idx, phase):
         is_train = phase == "train"

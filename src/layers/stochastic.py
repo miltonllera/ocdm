@@ -10,6 +10,7 @@ learned logar, wich means that all inputs share the same covariance. This is
 similar to the idea behind LDA.
 """
 
+from typing import Optional
 import numpy as np
 import torch
 import torch.nn as nn
@@ -92,8 +93,15 @@ def cosine_decay(start_value, end_value, n_steps):
 
 
 class GumbelSoftmax(nn.Module):
-    def __init__(self, input_size, n_cat, tau, tau_start=None,
-                 tau_steps=None, dim=-1):
+    def __init__(
+        self,
+        input_size: int,
+        n_cat: int,
+        tau: float,
+        tau_start: Optional[float] = None,
+        tau_steps: Optional[float] = None,
+        dim: int = -1
+    ):
         super().__init__()
         self.tau = tau
         self.dim = dim
