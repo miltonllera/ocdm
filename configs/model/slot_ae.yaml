@@ -5,7 +5,7 @@ defaults:
   - /training@training.schedulers.warmup: warmup
   - _self_
 
-_target_: src.model.slotae.SlotAutoEncoder
+_target_: src.model.grouping.SlotAutoEncoder
 
 slot:
   _target_: src.layers.slot.SlotAttention

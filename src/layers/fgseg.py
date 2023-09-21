@@ -65,7 +65,7 @@ class FigureGroundSegmentation(nn.Module):
 
     @property
     def shape(self):
-        return self.n_slots, self.slot_size
+        return 1, self.latent_size
 
     def reset_parameters(self):
         nn.init.xavier_uniform_(self.init_mu)
@@ -121,9 +121,8 @@ class FigureGroundSegmentation(nn.Module):
         q = split_heads(q.unsqueeze(1), self.nhead)
 
         weights = k @ q.transpose(2, 3)
-        weights = torch.sigmoid(join_heads(weights))
+        weights = torch.sigmoid(weights)
 
-        weights = split_heads(weights, self.nhead) + EPS
         weights = weights / weights.sum(dim=-2, keepdim=True)
 
         atten_maps = join_heads(weights.transpose(2, 3) @ v)

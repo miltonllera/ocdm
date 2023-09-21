@@ -5,7 +5,7 @@ defaults:
   - /training@training.schedulers.warmup: warmup
   - _self_
 
-_target_: src.model.slotae.FigGroundAutoEncoder
+_target_: src.model.grouping.FigGroundAutoEncoder
 
 fig_rep:
   _target_: src.layers.fgseg.FigureGroundSegmentation

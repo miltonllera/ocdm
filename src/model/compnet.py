@@ -113,7 +113,7 @@ class ObjectCentricCompositionNet(BaseModel):
 
     def forward(self, inputs):
         inputs, actions = inputs
-        B, Ni = inputs.shape[:2]  # Ni is always 2
+        B, Ni = len(inputs), self.slot.shape[0]
 
         # Format inputs so that we have shape (2 * batch_size, input_size)
         # and corresponding reference and transform images follow each other

@@ -5,7 +5,7 @@ defaults:
   - /training@training.schedulers.warmup: warmup
   - _self_
 
-_target_: src.model.slate.SLATE
+_target_: src.model.grouping.SLATE
 
 resolution: [16, 16]
 
