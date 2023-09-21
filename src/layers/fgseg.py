@@ -2,7 +2,6 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import Tensor
 from torch.nn.parameter import Parameter
 from .initialization import linear_init, gru_init
@@ -122,7 +121,7 @@ class FigureGroundSegmentation(nn.Module):
         q = split_heads(q.unsqueeze(1), self.nhead)
 
         weights = k @ q.transpose(2, 3)
-        weights = F.sigmoid(join_heads(weights))
+        weights = torch.sigmoid(join_heads(weights))
 
         weights = split_heads(weights, self.nhead) + EPS
         weights = weights / weights.sum(dim=-2, keepdim=True)
@@ -150,13 +149,10 @@ class FigDecoder(nn.Sequential):
     def decode_fig(self, inputs):
         fig_reps, _ = inputs
 
-        # batchify reconstruction
-        fig_reps = fig_reps.flatten(end_dim=1)
-
         rgba = super().forward(fig_reps)
 
         fig_recons, fig_mask = torch.tensor_split(rgba, indices=[-1], dim=1)
-        fig_mask = F.sigmoid(fig_mask)  # masks are logits
+        fig_mask = torch.sigmoid(fig_mask)  # masks are logits
 
         return fig_recons, fig_mask
 
