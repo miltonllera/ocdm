@@ -1,5 +1,6 @@
 import os
 import os.path as osp
+import logging
 from functools import partial
 from typing import List, Tuple, Dict
 from ignite.metrics import Metric
@@ -115,6 +116,10 @@ def instantiate_trainer(
         callbacks= callbacks,
         logger=logger,
     )
+
+    if trainer_cfg.fast_dev_run:
+        pil_logger = get_logger('PIL.PngImagePlugin')  # disable the most annoying logs of all time
+        pil_logger.setLevel(logging.INFO)
 
     return trainer
 
