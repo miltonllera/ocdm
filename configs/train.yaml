@@ -4,6 +4,7 @@ defaults:
   - _self_  # override defaults
   - dataset: null
   - model: null
+  - compile: default
   - callbacks: dafault
   - logger: tensorboard
   - trainer: dafault

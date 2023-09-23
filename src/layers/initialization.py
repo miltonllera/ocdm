@@ -5,9 +5,32 @@ Taken from:
     https://github.com/YannDubs/disentangling-vae/master/disvae/utils/initialization.py
 """
 
-
+from typing import Optional
 import torch
 from torch import nn
+
+
+def linear_init(layer, activation: Optional[str] = "relu", gain: float = 1.0):
+    """Initialize a linear layer.
+    Args:
+        layer (nn.Linear): parameters to initialize.
+        activation (`torch.nn.modules.activation` or str, optional) activation that
+            will be used on the `layer`.
+    """
+    x = layer.weight
+
+    if activation is None:
+        return nn.init.xavier_uniform_(x, gain=gain)
+
+    activation_name = get_activation_name(activation)
+
+    if activation_name == "leaky_relu":
+        a = 0 if isinstance(activation, str) else activation.negative_slope
+        return nn.init.kaiming_uniform_(x, a=a, nonlinearity='leaky_relu')
+    elif activation_name == "relu":
+        return nn.init.kaiming_uniform_(x, nonlinearity='relu')
+    elif activation_name in ["sigmoid", "tanh"]:
+        return nn.init.xavier_uniform_(x, gain=get_gain(activation))
 
 
 def get_activation_name(activation):
@@ -39,29 +62,6 @@ def get_gain(activation):
     gain = nn.init.calculate_gain(activation_name, param)
 
     return gain
-
-
-def linear_init(layer, activation="relu", gain=1.0):
-    """Initialize a linear layer.
-    Args:
-        layer (nn.Linear): parameters to initialize.
-        activation (`torch.nn.modules.activation` or str, optional) activation that
-            will be used on the `layer`.
-    """
-    x = layer.weight
-
-    if activation is None:
-        return nn.init.xavier_uniform_(x, gain=gain)
-
-    activation_name = get_activation_name(activation)
-
-    if activation_name == "leaky_relu":
-        a = 0 if isinstance(activation, str) else activation.negative_slope
-        return nn.init.kaiming_uniform_(x, a=a, nonlinearity='leaky_relu')
-    elif activation_name == "relu":
-        return nn.init.kaiming_uniform_(x, nonlinearity='relu')
-    elif activation_name in ["sigmoid", "tanh"]:
-        return nn.init.xavier_uniform_(x, gain=get_gain(activation))
 
 
 def weights_init(module, conv_activation='relu', linear_activation='relu'):

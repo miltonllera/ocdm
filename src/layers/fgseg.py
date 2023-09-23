@@ -123,7 +123,7 @@ class FigureGroundSegmentation(nn.Module):
         weights = k @ q.transpose(2, 3)
         weights = torch.sigmoid(weights)
 
-        weights = weights / weights.sum(dim=-2, keepdim=True)
+        weights = weights / (weights.sum(dim=-2, keepdim=True) + EPS)
 
         atten_maps = join_heads(weights.transpose(2, 3) @ v)
 
@@ -156,5 +156,5 @@ class FigDecoder(nn.Sequential):
         return fig_recons, fig_mask
 
     def forward(self, inputs: Tuple[Tensor, Tensor]) -> Tuple[Tensor, Tensor]:
-        slot_recons, fig_rep = self.decode_fig(inputs)
-        return (fig_rep * slot_recons), fig_rep
+        fig_recons, fig_mask = self.decode_fig(inputs)
+        return (fig_mask * fig_recons), fig_mask

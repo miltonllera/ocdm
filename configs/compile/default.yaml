@@ -1,0 +1,5 @@
+disable: true
+fullgraph: True
+dynamic: false
+mode: reduce-overhead
+backend: inductor

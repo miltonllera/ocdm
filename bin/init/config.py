@@ -44,7 +44,7 @@ OmegaConf.register_new_resolver(
 
 def instantiate_run(cfg) -> INSTANTIATED_RUN_MODULES:
     datamodule = instantiate_datamodule(cfg.dataset)
-    model = instantiate_model(cfg.model)
+    model = instantiate_model(cfg.model, cfg.compile)
     callbacks = instantiate_callbacks(cfg.callbacks)
     loggers = instantiate_loggers(cfg.logger)
     trainer = instantiate_trainer(cfg.trainer, callbacks, loggers)
@@ -60,9 +60,13 @@ def instantiate_datamodule(dataset_cfg) -> pl.LightningDataModule:
     return datamodule
 
 
-def instantiate_model(model_cfg) -> pl.LightningModule:
+def instantiate_model(model_cfg, compile_cfg=None) -> pl.LightningModule:
     _log.info(f"Initializing model <{model_cfg._target_}>...")
     model: pl.LightningModule = instantiate(model_cfg)
+
+    if compile_cfg is not None:
+        model = torch.compile(model, **compile_cfg)
+
     return model
 
 
@@ -117,7 +121,7 @@ def instantiate_trainer(
         logger=logger,
     )
 
-    if trainer_cfg.fast_dev_run:
+    if trainer.fast_dev_run:
         pil_logger = get_logger('PIL.PngImagePlugin')  # disable the most annoying logs of all time
         pil_logger.setLevel(logging.INFO)
 

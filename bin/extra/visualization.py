@@ -212,6 +212,10 @@ class SlotReconstruction(Visualzation):
         # get pixel level decoder mask
         if self.decoder_mask_extractor is not None:
             decoder_mask = self.decoder_mask_extractor(outputs)
+
+            if len(decoder_mask.shape) < 5:  # account for figure-ground segmentation
+                decoder_mask = decoder_mask.unsqueeze_(1)
+
             decoder_mask = decoder_mask.permute(0, 1, 3, 4, 2)
         else:
             decoder_mask = None
