@@ -12,8 +12,8 @@ class FigureGroundSegmentation(nn.Module):
     """
     Figure-ground segmentation based on the Slot Attention model.
 
-    Instead of slots competing amongst each other for input assignments, a
-    single latent representation tries to represent the patches that are
+    Instead of slots competing amongst each other for input assignments,
+    a single latent vector is tasked with representing the patches that are
     part of a target object (the figure) while ignoring the rest (background).
 
     The resulting model is much simpler than the original SA as it removes the
