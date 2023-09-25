@@ -7,8 +7,8 @@ import pytorch_lightning as pl
 from torch.nn.functional import one_hot
 from torch.utils.data import DataLoader, Dataset
 
-from .ood_loader import OODLoader
 from .utils import DatasetWrapper
+from .ood_loader import OODLoader
 from .sampler import ImbalancedSampler
 
 
@@ -94,8 +94,6 @@ class CompositionTaskDataModule(pl.LightningDataModule):
         return self.test_dataloader()
 
     def get_sampler(self, dataset):
-        dataset = dataset.dataset
-
         if self.rebalance_wrt_factor is not None:
             factors = dataset.factors
             factor = self.rebalance_wrt_factor
@@ -112,11 +110,11 @@ class CompositionTask(DatasetWrapper):
         self.index_map = IndexMap(base_dataset)
 
     def __getitem__(self, idx):
-        z_code = self.factor_code[idx]
+        z_code = self.factor_code[idx]  # type: ignore
         transf_z_code = z_code.copy()
 
         # select factor to transform and value to transform to
-        all_factors = np.arange(self.n_factors)
+        all_factors = np.arange(self.n_factors)  # type: ignore
         np.random.shuffle(all_factors)
 
         # Iterate through all dimensions until we sample a new value
@@ -132,18 +130,18 @@ class CompositionTask(DatasetWrapper):
 
         # sample a command image
         command_z_code = transf_z_code.copy()
-        for d in range(len(self.factor_sizes)):
+        for d in range(len(self.factor_sizes)):  # type: ignore
             if d != dim:
                 command_z_code[d] = self.sample_factor(command_z_code, d)
 
         action = one_hot(
             torch.LongTensor([dim]),
-            num_classes=self.n_factors
+            num_classes=self.n_factors  # type: ignore
         ).squeeze()
 
-        img = self.transform(self.images[idx])
-        command_img = self.transform(self.code_to_image(command_z_code))
-        transformed_img = self.transform(self.code_to_image(transf_z_code))
+        img = self.dataset[idx][0]
+        command_img = self.dataset[self.code_to_image(command_z_code)][0]
+        transformed_img = self.dataset[self.code_to_image(transf_z_code)][0]
 
         input_imgs = torch.stack([img, command_img], dim=0).contiguous()
         target = torch.stack(
@@ -184,7 +182,7 @@ class CompositionTask(DatasetWrapper):
 
     def code_to_image(self, code):
         idx = self.index_map[self.code_to_index(code)]
-        return self.images[idx]
+        return self.dataset[idx][0]
 
 
 class IndexMap:
