@@ -1,12 +1,12 @@
-from typing import Tuple, Literal
+from typing import Tuple, Literal, Union
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from src.training.loss import ReconstructionLoss
 from src.layers.composition import CompositionOp, SlotComposition
 from src.layers.slot import SlotAttention, SlotDecoder
+from src.layers.fgseg import FigDecoder, FigureGroundSegmentation
 
 from .base import BaseModel, TrainingInit
 
@@ -91,29 +91,31 @@ class CompositionNet(BaseModel):
         return loss
 
 
-class ObjectCentricCompositionNet(BaseModel):
+class OCCompNet(BaseModel):
     def __init__(
         self,
         encoder: nn.Sequential,
-        slot: SlotAttention,
-        decoder: SlotDecoder,
-        slot_selector: nn.Sequential,
+        slot: Union[SlotAttention, FigureGroundSegmentation],
+        decoder: Union[SlotDecoder, FigDecoder],
         composition_op: SlotComposition,
         recons_loss: ReconstructionLoss,
         training: TrainingInit,
     ):
+        if not (isinstance(slot, SlotAttention) and isinstance(decoder, SlotDecoder)) and \
+            not (isinstance(slot, FigureGroundSegmentation) and isinstance(decoder, FigDecoder)):
+                raise ValueError
+
         super().__init__(training)
 
         self.encoder = encoder
         self.slot = slot
         self.decoder = decoder
-        self.slot_selector = slot_selector
         self.composition_op = composition_op
         self.recons_loss = recons_loss
 
     def forward(self, inputs):
         inputs, actions = inputs
-        B, Ni = len(inputs), self.slot.shape[0]
+        B, Ni = inputs.shape[:2]  # Ni is always 2
 
         # Format inputs so that we have shape (2 * batch_size, input_size)
         # and corresponding reference and transform images follow each other

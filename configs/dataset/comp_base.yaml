@@ -1,6 +1,6 @@
 _target_: src.dataset.comptask.CompositionTaskDataModule
 
-dataset_name: null
+dataset_cls: null
 path: null
 
 split_condition: null

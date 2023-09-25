@@ -1,13 +1,13 @@
 defaults:
-  - /loss: recons_mse
+  - /loss@recons_loss: recons_mse
   - /training: default
   - /training@training.schedulers.exponential: exponential
   - /training@training.schedulers.warmup: warmup
   - _self_
 
-_target_: src.model.grouping.FigGroundAutoEncoder
+_target_: src.model.compnet.OCCompNet
 
-fig_rep:
+slot:
   _target_: src.layers.fgseg.FigureGroundSegmentation
   input_size: 64
   latent_size: 64
@@ -15,6 +15,11 @@ fig_rep:
   n_iter: 3
   hidden_size: 128
   approx_implicit_grad: False
+
+composition_op:
+  _target_: src.layers.composition.MLPComp
+  latent_size: ${model.slot.latent_size}
+  n_actions: -1
 
 encoder:
   _target_: bin.init.parsing.create_sequential
@@ -30,13 +35,13 @@ encoder:
     - [posemb2d, {embed: cardinal}]
     - [flatten, [1, 2]]
     - [layer_norm, [-1]]
-    - [linear, ["${model.fig_rep.input_size}"]]
+    - [linear, ["${model.slot.input_size}"]]
     - [relu]
 
 decoder:
   _target_: bin.init.parsing.create_sequential
   constructor: "${get_cls: src.layers.fgseg.FigDecoder}"
-  input_size: ${model.fig_rep.latent_size}
+  input_size: ${model.slot.latent_size}
   layer_defs:
     - [spatbroad, [8, 8], {input_last: True}]
     - [posemb2d, {embed: cardinal}]

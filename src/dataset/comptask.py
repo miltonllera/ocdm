@@ -1,11 +1,11 @@
-from typing import Any, Dict, List,  Optional
+from typing import Any, Dict, List,  Optional, Type
 
 import numpy as np
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 from torch.nn.functional import one_hot
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 from .ood_loader import OODLoader
 from .utils import DatasetWrapper
@@ -15,7 +15,7 @@ from .sampler import ImbalancedSampler
 class CompositionTaskDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        dataset_name: str,
+        dataset_cls: Type[Dataset],
         path: str,
         split_condition: Optional[str] = None,
         split_variant: Optional[str] = None,
@@ -36,7 +36,7 @@ class CompositionTaskDataModule(pl.LightningDataModule):
         self.num_workers = num_workers
 
         self.loader = OODLoader(
-            dataset_name,
+            dataset_cls,
             path,
             split_condition,
             split_variant,

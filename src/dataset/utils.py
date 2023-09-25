@@ -50,5 +50,5 @@ class DatasetWrapper(Dataset):
         Used to directly access dataset properties (eg. self.latent_factors)
         '''
         if hasattr(self, name):
-            return hasattr
+            return self.name
         return self.dataset.__getattr__(name)

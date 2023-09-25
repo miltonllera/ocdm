@@ -98,7 +98,7 @@ class FigureGroundSegmentation(nn.Module):
         if self.approx_implicit_grad:
             figure_rep, atten_masks = self.step(figure_rep.detach(), k, v)
 
-        return figure_rep, atten_masks.sum(dim=1)  #type: ignore [reportGeneralTypeIssues]
+        return figure_rep.unsqueeze(1), atten_masks.sum(dim=1)  #type: ignore [reportGeneralTypeIssues]
 
     def init_fig_rep(self, inputs):
         std = self.init_logvar.mul(0.5).exp()
@@ -148,7 +148,7 @@ class FigDecoder(nn.Sequential):
     def decode_fig(self, inputs):
         fig_reps, _ = inputs
 
-        rgba = super().forward(fig_reps)
+        rgba = super().forward(fig_reps.sequeeze(1))
 
         fig_recons, fig_mask = torch.tensor_split(rgba, indices=[-1], dim=1)
         fig_mask = torch.sigmoid(fig_mask)  # masks are logits
