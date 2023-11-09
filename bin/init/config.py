@@ -121,7 +121,7 @@ def instantiate_trainer(
         logger=logger,
     )
 
-    if trainer.fast_dev_run:
+    if trainer_cfg.fast_dev_run:
         pil_logger = get_logger('PIL.PngImagePlugin')  # disable the most annoying logs of all time
         pil_logger.setLevel(logging.INFO)
 
