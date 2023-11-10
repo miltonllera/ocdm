@@ -64,8 +64,8 @@ def instantiate_model(model_cfg, compile_cfg=None) -> pl.LightningModule:
     _log.info(f"Initializing model <{model_cfg._target_}>...")
     model: pl.LightningModule = instantiate(model_cfg)
 
-    if compile_cfg is not None:
-        model = torch.compile(model, **compile_cfg)
+    # if compile_cfg is not None:
+    #     model = torch.compile(model, **compile_cfg)
 
     return model
 
@@ -121,7 +121,7 @@ def instantiate_trainer(
         logger=logger,
     )
 
-    if trainer_cfg.fast_dev_run:
+    if trainer_cfg.get('fast_dev_run', False):
         pil_logger = get_logger('PIL.PngImagePlugin')  # disable the most annoying logs of all time
         pil_logger.setLevel(logging.INFO)
 
@@ -133,7 +133,7 @@ def instantiate_trainer(
 def instantiate_analysis(cfg: DictConfig) -> Analysis:
     _log.info(f"Initializing analysis module...")
 
-    datamodule, model, trainer = load_run(cfg.run_path)
+    datamodule, model, trainer = load_run(cfg.run_path, cfg.overrides)
 
     metrics: Dict[str, Metric] = instantiate_metrics(cfg.metrics)
 
@@ -153,11 +153,14 @@ def instantiate_analysis(cfg: DictConfig) -> Analysis:
     return analysis_module
 
 
-def load_run(run_path: str) -> INSTANTIATED_RUN_MODULES:
+def load_run(run_path: str, overrides: DictConfig) -> INSTANTIATED_RUN_MODULES:
     _log.info(f"Loading run found at <{run_path}>...")
 
     run_cfg = load_cfg(run_path)
     run_cfg.logger = None
+
+    run_cfg.merge_with(overrides)
+
     datamodule, model, trainer = instantiate_run(run_cfg)
     model.load_state_dict(load_best_model(run_path))
 

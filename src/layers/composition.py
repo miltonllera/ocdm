@@ -21,7 +21,7 @@ class CompositionOp(nn.Module):
         inputs: torch.Tensor,
         actions: torch.Tensor
     ) -> torch.Tensor:
-        raise NotImplementedError
+        return self.forward(inputs, actions)
 
 
 class SoftmaxComp(CompositionOp):

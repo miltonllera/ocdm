@@ -1,0 +1,7 @@
+defaults:
+  - base
+  - _self_
+
+dataset_cls: "${get_cls: src.dataset.non_pentominos.NonPentominos}"
+path: "data/datasets/non_pentominos/"
+num_workers: 6

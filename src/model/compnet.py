@@ -91,7 +91,7 @@ class CompositionNet(BaseModel):
         return loss
 
 
-class OCCompNet(BaseModel):
+class ForegroundCompNet(BaseModel):
     def __init__(
         self,
         encoder: nn.Sequential,
@@ -124,32 +124,19 @@ class OCCompNet(BaseModel):
         h = self.encoder(inputs)
         slots, _ = self.slot(h)
 
-        # slots_og, slots_tr = slots.unflatten(0, (B, Ni)).chunk(Ni, dim=1)
-        # slot_masks_og, slot_masks_tr = slots.unflatten(0, (B, Ni)).chunk(Ni, dim=1)
+        # Composition operations expect a shape of (B, Ni, Z). Thus we undo the flattening
+        # of the first 2 dimension used to apply the input encoder and squeeze the slot dimension.
+        # slots = slots.unflatten(0, (B, Ni))
+        new_slots = self.composition_op(
+            slots.squeeze(1).unflatten(0, (B, Ni)), actions
+        ).unsqueeze(1)
 
-        # selected_og, other_og, _ = self.select_slot(slots_og, actions)  # first is the selected one
-        # selected_tr, _, _ = self.select_slot(slots_tr, actions)
+        # We return the outputs in shape (B, Ni, 1, Z), but need to flatten the first two
+        # dimension when decoding, so only the unsqueezing is saved.
+        all_slots = torch.cat((slots, new_slots), dim=0).unsqueeze(1)
+        recons, _ = self.decoder((all_slots.flatten(0, 1), None))
 
-        # selected_slot = torch.cat((selected_og, selected_tr), dim=1)
-
-        # transformed_slot = self.composition_op(selected_slot, actions)
-        # new_slots = torch.cat((transformed_slot, other_og), dim=1)
-
-        new_slots = self.composition_op(slots.unflatten(0, (B, Ni)), actions)
-
-        all_slots = torch.cat((slots, new_slots), dim=0)
-        recons = self.decoder(all_slots).unflatten(0, (B, Ni + 1))
-
-        return recons, new_slots
-
-    # def select_slot(self, slots, actions):
-    #     actions = actions.unsqueeze(1).expand(-1, self.slot.n_slots, -1)
-    #     slot_and_actions = torch.cat((slots, actions), dim=-1)
-
-    #     slot_probs = F.softmax(self.slot_selector(slot_and_actions), dim=1)
-    #     sorted_slots, idx = slot_probs.sort(dim=1, descending=True)
-
-    #     return sorted_slots[:, :1], sorted_slots[:, 1:], idx
+        return recons.unflatten(0, (B, Ni + 1)), all_slots
 
     def _step(self, batch, batch_idx, phase):
         is_train = phase == "train"

@@ -24,4 +24,4 @@ python -m bin.generate_non_pentominos \
   --num_colors 1 \
   --num_xs 20 \
   --num_ys 20 \
-  --folder data/assets/non_ponetominos/
+  --folder data/datasets/non_pentominos/

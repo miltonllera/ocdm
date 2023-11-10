@@ -72,7 +72,7 @@ class IIDDataModule(LightningDataModule):
 
         assert (not split_data or
             (len(split_sizes) == 3 and self.loader.split_test is None) or
-            (len(split_sizes)== 2 and self.loader.split_test is not None)
+            (len(split_sizes) == 2 and self.loader.split_test is not None)
         )
 
     def setup(self, stage: Optional[str] = None) -> None:

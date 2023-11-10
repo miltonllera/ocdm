@@ -29,7 +29,7 @@ dataset:
 
 model:
   composition_op:
-    n_actions: 5
+    n_actions: 6
   training:
     optimizer:
       lr: 0.001

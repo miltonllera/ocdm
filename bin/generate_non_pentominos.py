@@ -50,23 +50,23 @@ class SpriteLoader(SpriteDict):
 
     def get_shape(self, shape):
         if shape == 0:  # star
-            img = plt.imread("data/datasets/non_pentominos/assets/star_large.png")[..., 0].T
+            img = plt.imread("data/assets/non_pentominos/star_large.png")[..., 0].T
         elif shape == 1:
-            img = plt.imread("data/datasets/non_pentominos/assets/heart_large.png")[..., 0].T
+            img = plt.imread("data/assets/non_pentominos/heart_large.png")[..., 0].T
         elif shape == 2:
-            img = plt.imread("data/datasets/non_pentominos/assets/donut_large.png")[..., 0].T
+            img = plt.imread("data/assets/non_pentominos/donut_large.png")[..., 0].T
         elif shape == 3:
-            img = plt.imread("data/datasets/non_pentominos/assets/beignet_large.png")[..., 0].T
+            img = plt.imread("data/assets/non_pentominos/beignet_large.png")[..., 0].T
         elif shape == 4:
-            img = plt.imread("data/datasets/non_pentominos/assets/snake_large.png")[..., 0].T
+            img = plt.imread("data/assets/non_pentominos/snake_large.png")[..., 0].T
         elif shape == 5:
-            img = plt.imread("data/datasets/non_pentominos/assets/square_large.png")[..., 0].T
+            img = plt.imread("data/assets/non_pentominos/square_large.png")[..., 0].T
         elif shape == 6:
-            img = plt.imread("data/datasets/non_pentominos/assets/ellipses.png")[..., 0].T
+            img = plt.imread("data/assets/non_pentominos/ellipses.png")[..., 0].T
         elif shape == 7:
-            img = plt.imread("data/datasets/non_pentominos/assets/hexagon_large.png")[..., 0].T
+            img = plt.imread("data/assets/non_pentominos/hexagon_large.png")[..., 0].T
         elif shape == 8:
-            img = plt.imread("data/datasets/non_pentominos/assets/b_large.png")[..., 0].T
+            img = plt.imread("data/assets/non_pentominos/b_large.png")[..., 0].T
         else:
 
             raise ValueError(f"Unrecognized shape code {shape}")

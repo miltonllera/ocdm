@@ -7,6 +7,8 @@ metrics: {}
 
 visualizations: {}
 
+overrides: {}
+
 logger:
   figure_logger:
     _target_: bin.extra.logger.FolderLogger

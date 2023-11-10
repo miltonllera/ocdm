@@ -5,7 +5,7 @@ defaults:
   - /training@training.schedulers.warmup: warmup
   - _self_
 
-_target_: src.model.compnet.OCCompNet
+_target_: src.model.compnet.ForegroundCompNet
 
 slot:
   _target_: src.layers.fgseg.FigureGroundSegmentation
@@ -17,13 +17,13 @@ slot:
   approx_implicit_grad: False
 
 composition_op:
-  _target_: src.layers.composition.MLPComp
+  _target_: src.layers.composition.InterpolationComp
   latent_size: ${model.slot.latent_size}
   n_actions: -1
 
 encoder:
   _target_: bin.init.parsing.create_sequential
-  input_size: [3, 64, 64]
+  input_size: [1, 64, 64]
   layer_defs:
     - [conv, [64, 4, 2, 1]]
     - [relu]

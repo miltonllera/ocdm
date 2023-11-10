@@ -140,8 +140,8 @@ class CompositionTask(DatasetWrapper):
         ).squeeze()
 
         img = self.dataset[idx][0]
-        command_img = self.dataset[self.code_to_image(command_z_code)][0]
-        transformed_img = self.dataset[self.code_to_image(transf_z_code)][0]
+        command_img = self.code_to_image(command_z_code)
+        transformed_img = self.code_to_image(transf_z_code)
 
         input_imgs = torch.stack([img, command_img], dim=0).contiguous()
         target = torch.stack(

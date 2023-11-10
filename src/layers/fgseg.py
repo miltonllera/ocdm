@@ -148,7 +148,7 @@ class FigDecoder(nn.Sequential):
     def decode_fig(self, inputs):
         fig_reps, _ = inputs
 
-        rgba = super().forward(fig_reps.sequeeze(1))
+        rgba = super().forward(fig_reps.squeeze(1))
 
         fig_recons, fig_mask = torch.tensor_split(rgba, indices=[-1], dim=1)
         fig_mask = torch.sigmoid(fig_mask)  # masks are logits
