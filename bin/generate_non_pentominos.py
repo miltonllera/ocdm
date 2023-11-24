@@ -74,11 +74,11 @@ class SpriteLoader(SpriteDict):
         img = np.pad(1 - img, pad_width=((2,2), (2,2)), mode='constant')
         contours = measure.find_contours(img, level=0.99)
 
-        _, ax = plt.subplots()
-        ax.imshow(img, cmap=plt.cm.gray)
+        # _, ax = plt.subplots()
+        # ax.imshow(img, cmap=plt.cm.gray)
 
-        for contour in contours:
-            ax.plot(contour[:, 1], contour[:, 0], linewidth=2)
+        # for contour in contours:
+        #     ax.plot(contour[:, 1], contour[:, 0], linewidth=2)
 
         vertices = contours[0]  # there should be only one shape
         vertices = (vertices - vertices.min(axis=0)) * 10 / vertices.max()
