@@ -90,45 +90,60 @@
 
 #------------------------ Pretrained SA model on non-pentominos ------------------------------------
 
-PENTOMINO_PRETRAINED=data/logs/unsupervised/pentominos/slot_ae/new_shape/2023-04-23_21-21
-
-python -m bin.analyze analysis=score_slot_recons \
-  run_path=$PENTOMINO_PRETRAINED \
-  +dataset@overrides.dataset=non-pentominos \
-  +overrides.dataset.split_sizes="[0.00, 0.01, 0.99]" \
-  logger.figure_logger.name="standard-pentominos"
-
-python -m bin.analyze analysis=slot_recons \
-  run_path=$PENTOMINO_PRETRAINED \
-  +dataset@overrides.dataset=non-pentominos \
-  +overrides.dataset.split_sizes="[0.00, 0.00, 1.00]" \
-  visualizations.slot_reconstruction.data_split=test \
-  logger.figure_logger.name="standard-pentominos"
-
-python -m bin.analyze analysis=score_slot_recons \
-  run_path=$PENTOMINO_PRETRAINED \
-  +dataset@overrides.dataset=large_pentominos \
-  +overrides.dataset.split_sizes="[0.00, 0.01, 0.99]" \
-  logger.figure_logger.name="larger-pentominos"
-
-python -m bin.analyze analysis=slot_recons \
-  run_path=$PENTOMINO_PRETRAINED \
-  +dataset@overrides.dataset=large_pentominos \
-  +overrides.dataset.split_sizes="[0.00, 0.00, 1.00]" \
-  visualizations.slot_reconstruction.data_split=test \
-  logger.figure_logger.name="larger-pentominos"
-
-#------------------------ Pretrained FG-Seg model on non-pentominos --------------------------------
-
-# PENTOMINO_PRETRAINED=data/logs/unsupervised/pentominos/fgseg/baseline/2023-11-23_10-17
-
-# python -m bin.analyze analysis=slot_recons \
-#   run_path=$PENTOMINO_PRETRAINED \
-#   +dataset@overrides.dataset=non_pentominos \
-#   +overrides.dataset.split_sizes="[0.00, 0.00, 1.00]" \
-#   visualizations.slot_reconstruction.data_split=test
+# PENTOMINO_PRETRAINED=data/logs/unsupervised/pentominos/slot_ae/new_shape/2023-04-23_21-21
 
 # python -m bin.analyze analysis=score_slot_recons \
 #   run_path=$PENTOMINO_PRETRAINED \
-#   +dataset@overrides.dataset=non_pentominos \
-#   +overrides.dataset.split_sizes="[0.01, 0.01, 0.98]"
+#   +dataset@overrides.dataset=non-pentominos \
+#   +overrides.dataset.split_sizes="[0.00, 0.01, 0.99]" \
+#   logger.figure_logger.name="standard-pentominos"
+
+# python -m bin.analyze analysis=slot_recons \
+#   run_path=$PENTOMINO_PRETRAINED \
+#   +dataset@overrides.dataset=non-pentominos \
+#   +overrides.dataset.split_sizes="[0.00, 0.00, 1.00]" \
+#   visualizations.slot_reconstruction.data_split=test \
+#   logger.figure_logger.name="standard-pentominos"
+
+# python -m bin.analyze analysis=score_slot_recons \
+#   run_path=$PENTOMINO_PRETRAINED \
+#   +dataset@overrides.dataset=large_pentominos \
+#   +overrides.dataset.split_sizes="[0.00, 0.01, 0.99]" \
+#   logger.figure_logger.name="larger-pentominos"
+
+# python -m bin.analyze analysis=slot_recons \
+#   run_path=$PENTOMINO_PRETRAINED \
+#   +dataset@overrides.dataset=large_pentominos \
+#   +overrides.dataset.split_sizes="[0.00, 0.00, 1.00]" \
+#   visualizations.slot_reconstruction.data_split=test \
+#   logger.figure_logger.name="larger-pentominos"
+
+#------------------------ Pretrained FG-Seg model on non-pentominos --------------------------------
+
+PENTOMINO_PRETRAINED=data/logs/unsupervised/pentominos/fgseg/baseline/2023-11-23_10-17
+
+python -m bin.analyze analysis=score_slot_recons \
+  run_path=$PENTOMINO_PRETRAINED \
+  +dataset@overrides.dataset=non-pentominos \
+  +overrides.dataset.split_sizes="[0.00, 0.01, 0.99]" \
+  logger.figure_logger.name="standard-pentominos"
+
+python -m bin.analyze analysis=slot_recons \
+  run_path=$PENTOMINO_PRETRAINED \
+  +dataset@overrides.dataset=non-pentominos \
+  +overrides.dataset.split_sizes="[0.00, 0.00, 1.00]" \
+  visualizations.slot_reconstruction.data_split=test \
+  logger.figure_logger.name="standard-pentominos"
+
+python -m bin.analyze analysis=score_slot_recons \
+  run_path=$PENTOMINO_PRETRAINED \
+  +dataset@overrides.dataset=large_pentominos \
+  +overrides.dataset.split_sizes="[0.00, 0.01, 0.99]" \
+  logger.figure_logger.name="larger-pentominos"
+
+python -m bin.analyze analysis=slot_recons \
+  run_path=$PENTOMINO_PRETRAINED \
+  +dataset@overrides.dataset=large_pentominos \
+  +overrides.dataset.split_sizes="[0.00, 0.00, 1.00]" \
+  visualizations.slot_reconstruction.data_split=test \
+  logger.figure_logger.name="larger-pentominos"
