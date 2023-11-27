@@ -26,7 +26,7 @@ export PAD=2
 #   --num_colors 1 \
 #   --num_xs 20 \
 #   --num_ys 20 \
-#   --folder data/datasets/pentominos/larger-scales
+#   --folder data/datasets/pentominos/larger_scales
 
 
 # NOTE: non-pentominos base size is 16 (as opposed to 10 like in pentominos)
@@ -38,4 +38,4 @@ python -m bin.generate_non_pentominos \
   --num_colors 1 \
   --num_xs 20 \
   --num_ys 20 \
-  --folder data/datasets/non_pentominos/corrected-scales
+  --folder data/datasets/non_pentominos/corrected_scales

@@ -3,5 +3,5 @@ defaults:
   - _self_
 
 dataset_cls: "${get_cls: src.dataset.non_pentominos.NonPentominos}"
-path: "data/datasets/non_pentominos/corrected_scales"
+path: "data/datasets/non_pentominos/larger_scales"
 num_workers: 6

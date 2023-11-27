@@ -1,0 +1,5 @@
+defaults:
+  - pentominos
+  - _self_
+
+path: "data/datasets/pentominos/larger_scales/"
