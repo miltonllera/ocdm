@@ -39,9 +39,12 @@ class SpriteLoader(SpriteDict):
         DONUT = 2
         BEIGNET = 3
         SNAKE = 4
+        ELLIPSE = 5
+        HEXAGON = 6
+        B = 7
 
     def __len__(self):
-        return 4
+        return 8
 
     def __getitem__(self, entry: Union[int, str]):
         if isinstance(entry, str):
@@ -80,7 +83,9 @@ class SpriteLoader(SpriteDict):
         # for contour in contours:
         #     ax.plot(contour[:, 1], contour[:, 0], linewidth=2)
 
-        vertices = contours[0]  # there should be only one shape
+        assert len(contours) == 1  # there should be only one shape
+
+        vertices = contours[0]
         vertices = (vertices - vertices.min(axis=0)) * 10 / vertices.max()
 
         correction_mask = np.zeros_like(vertices)
