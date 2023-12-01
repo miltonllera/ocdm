@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import os
 import os.path as osp
 import json
+import multiprocessing as mp
 from itertools import product
 from typing import Optional, Tuple
 
@@ -84,6 +85,8 @@ class SpriteGenerator:
         self.aa = anti_aliasing
         self.interpolation = interpolation
         self.canonical_interp = canonical_interpolation
+        self._save_folder = None
+        self._sprite_dict = None
 
     @property
     def image_size(self) -> Tuple[int, int]:
@@ -94,6 +97,9 @@ class SpriteGenerator:
     def __call__(self, sprite_dict: SpriteDict, folder: str) -> None:
         image_folder = osp.join(folder, "images")
         os.makedirs(image_folder, exist_ok=True)
+
+        self._save_folder = image_folder
+        self._sprite_dict = sprite_dict
 
         shapes = np.array(list(range(len(sprite_dict))))
         colors = np.linspace(*self.lim_colors, self.num_colors, endpoint=True)
@@ -114,23 +120,26 @@ class SpriteGenerator:
             shapes, colors, scales, angles, pos_xs, pos_ys
         )
 
-        value_dict = []
+        N_CPUS = mp.cpu_count() - 1
 
-        for i, (shp, col, scl, ang, tx, ty) in enumerate(all_combinations):
-            image_file = f"image_{i:08}.png"
+        if N_CPUS > 1:
+            n_combinations = (
+                len(shapes) * len(colors) * len(scales) * len(angles) * len(pos_xs) * len(pos_ys)
+            )
 
-            image = self.generate_image(sprite_dict, shp, col, scl, ang, tx, ty)
-            image.save(osp.join(image_folder, image_file))
+            with mp.Pool(N_CPUS) as pool:
+                value_dict = pool.imap(
+                    self.generate_instance,
+                    enumerate(all_combinations),
+                    int(np.ceil(n_combinations / N_CPUS)),
+                )
 
-            value_dict.append({
-                'image_file_name': image_file,
-                'shape': int(shp),
-                'color': col,
-                'scale': scl,
-                'angle': ang,
-                'pos_x': tx,
-                'pos_y': ty
-            })
+                value_dict = list(value_dict)
+
+        else:
+            value_dict = []
+            for params in enumerate(all_combinations):
+                value_dict.append(self.generate_instance(params))
 
         json_output = {
             'data': value_dict,
@@ -210,6 +219,25 @@ class SpriteGenerator:
         image.paste(canvas, self.padding)
 
         return image
+
+    def generate_instance(self, params):
+        i, (shp, col, scl, ang, tx, ty) = params
+
+        image_file = f"image_{i:08}.png"
+
+        image = self.generate_image(self._sprite_dict, shp, col, scl, ang, tx, ty)
+        image.save(osp.join(self._save_folder, image_file))
+
+        return {
+            'image_file_name': image_file,
+            'shape': int(shp),
+            'color': col,
+            'scale': scl,
+            'angle': ang,
+            'pos_x': tx,
+            'pos_y': ty
+        }
+
 
 def hsv_to_rgb(c):
   """Convert HSV tuple to RGB tuple."""

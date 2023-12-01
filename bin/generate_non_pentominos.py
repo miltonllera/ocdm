@@ -65,13 +65,12 @@ class SpriteLoader(SpriteDict):
         elif shape == 5:
             img = plt.imread("data/assets/non_pentominos/square_large.png")[..., 0].T
         elif shape == 6:
-            img = plt.imread("data/assets/non_pentominos/ellipses.png")[..., 0].T
+            img = plt.imread("data/assets/non_pentominos/ellipsis_large.png")[..., 0].T
         elif shape == 7:
             img = plt.imread("data/assets/non_pentominos/hexagon_large.png")[..., 0].T
         elif shape == 8:
             img = plt.imread("data/assets/non_pentominos/b_large.png")[..., 0].T
         else:
-
             raise ValueError(f"Unrecognized shape code {shape}")
 
         img = np.pad(1 - img, pad_width=((2,2), (2,2)), mode='constant')
