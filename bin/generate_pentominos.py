@@ -38,6 +38,7 @@ def main(args):
         args.num_xs,
         args.lim_ys,
         args.num_ys,
+        0,  # number of corner cutting iterations.
         args.aa,
     )(PentominoLoader(), args.folder)
 

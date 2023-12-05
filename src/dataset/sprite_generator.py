@@ -163,7 +163,7 @@ class SpriteGenerator:
             }
         }
 
-        with open(folder + "pentominos.json", mode="w+") as f:
+        with open(osp.join(folder, "pentominos.json"), mode="w+") as f:
             json.dump(json_output, f)
 
     def generate_image(self, shape_dict, shape, color, scale, angle, tx, ty, value=1.0):
