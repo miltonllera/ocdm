@@ -21,10 +21,16 @@
 # Three new shapes
 
 # python -m bin.train experiment=slotae_pentomino_three_new_shapes
-python -m bin.train experiment=wae_pentomino_three_new_shapes
+# python -m bin.train experiment=wae_pentomino_three_new_shapes
 
 
-# Half novel shapes
+# # Half novel shapes
 
-# python -m bin.train experiment=slotae_pentomino_half_new_shapes
-python -m bin.train experiment=wae_pentomino_half_new_shapes
+# # python -m bin.train experiment=slotae_pentomino_half_new_shapes
+# python -m bin.train experiment=wae_pentomino_half_new_shapes
+
+
+# Novel scales for all but one shape
+
+# python -m bin.train experiment=slotae_pentominios_scale_combgen_from_loo
+python -m bin.train experiment=fgseg_pentominos_scale_combgen_from_loo

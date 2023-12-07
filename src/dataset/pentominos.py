@@ -123,6 +123,7 @@ class Pentominos(Dataset):
         return {
             'combgen': {
                 'shape_and_rotation': _masks.shape_and_rotation,
+                'scale_combgen_from_loo': _masks.scale_combgen_from_loo,
             },
             'extrap': {
                 'new_shape': _masks.new_shape,
@@ -248,6 +249,19 @@ class _masks:
     def half_new_shapes(cls):
         def test_mask(factor_values, factor_classes):
             return np.isin(factor_values[:, cls.shp], [1, 3, 4, 5, 7, 8])
+
+        def train_mask(factor_values, factor_classes):
+            return ~test_mask(factor_values, factor_classes)
+
+        return train_mask, test_mask
+
+    @class_property
+    def scale_combgen_from_loo(cls):
+        def test_mask(factor_values, factor_classes):
+            return (
+                (factor_classes[:, cls.scl] == 4) &  # exclude large scales
+                (factor_values[:, cls.shp] != 8)     # except for all but one shape
+            )
 
         def train_mask(factor_values, factor_classes):
             return ~test_mask(factor_values, factor_classes)
