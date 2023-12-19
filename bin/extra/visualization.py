@@ -446,17 +446,21 @@ class SlotRepresentation(ReconstructionViz):
 
     @torch.no_grad()
     def select_slot(self, model, inputs, targets):
-        assignments = []
-        idx = 0
+        # assignments = []
+        # idx = 0
 
-        for x, y in zip(inputs, targets):
-            x, y = x[None].to(device=model.device), y[None].to(device=model.device)
+        # for x, y in zip(inputs, targets):
+        #     x, y = x[None].to(device=model.device), y[None].to(device=model.device)
 
-            a = model.slot_assignment(x, y)
+        #     a = model.slot_assignment(x, y)
 
-            assignments.append(a)
+        #     assignments.append(a)
 
-        return torch.cat(assignments)[:, [idx]], targets[:, [idx]]
+        # return torch.cat(assignments)[:, [idx]], targets[:, [idx]]
+
+        # assume there is only one slot
+        print(inputs.shape)
+        return inputs[:, [0]], targets
 
 
 class TraversalReconstruction(Visualzation):
