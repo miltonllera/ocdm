@@ -386,35 +386,49 @@ class SlotRepresentation(ReconstructionViz):
         train_manifold = np.transpose(train_manifold, (1, 0, 2))
         test_manifold = np.transpose(test_manifold, (1, 0, 2))
 
-        n_slots = train_manifold.shape[0]
+        # n_slots = train_manifold.shape[0]
+        angles = list(range(0, 360, 60))
 
-        fig, axes = plt.subplots(nrows=n_slots, figsize=(15, 10))
+        fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 10), subplot_kw={'projection':'3d'})
+        # axes = [fig.add_subplot(1, len(angles), i + 1, projection='3d') for i in range(len(angles))]
 
-        if not isinstance(axes, np.ndarray):
-            axes = [axes]
+        # if not isinstance(axes, np.ndarray):
+        #     axes = [axes]
 
-        for proj, ax in zip(train_manifold, axes):
-            x, y = proj.T
-            ax.scatter(x, y, color='k')
+        proj_train = train_manifold.squeeze()
+        proj_test = test_manifold.squeeze()
+        for ang, ax in zip(angles, axes.ravel()):
+            ax.scatter(*proj_train.T, color='k')
+            ax.scatter(*proj_test.T, color='r', marker='x')
+            ax.view_init(azim=ang)
 
-        for proj, ax in zip(test_manifold, axes):
-            x, y = proj.T
-            ax.scatter(x, y, color='r', marker='x')
+        # for proj, ax in zip(train_manifold, axes):
+        #     if proj.shape[1] == 2:
+        #         x, y = proj.T
+        #         ax.scatter(x, y, color='k')
 
-        for ax in axes:
-            strip_plot(ax)
+        #     elif proj.shape[1] == 3:
+        #         x, y, z = proj.T
+        #         ax.scatter(x, y, z, color='k')
+
+        # for proj, ax in zip(test_manifold, axes):
+        #     if proj.shape[1] == 2:
+        #         x, y = proj.T
+        #         ax.scatter(x, y, color='r', marker='x')
+
+        #     elif proj.shape[1] == 3:
+        #         x, y, z = proj.T
+        #         ax.scatter(x, y, z, color='r', marker='x')
+        #         ax.view_init(azim=-150)
+
+        # for ax in axes:
+        #     strip_plot(ax)
 
         return fig
 
     def transform(self, train_embeddings, test_embeddings, model):
         train_slots, train_targets = train_embeddings
         test_slots, test_targets = test_embeddings
-
-        if self.subsample > 0:
-            train_slots, train_targets, test_slots, test_targets = subsample(
-                train_slots, train_targets, test_slots, test_targets,
-                n_samples=self.subsample
-            )
 
         # Extract the slot that is representing the relevant object
         train_slots, train_targets = self.select_slot(
@@ -423,24 +437,50 @@ class SlotRepresentation(ReconstructionViz):
         test_slots, test_targets = self.select_slot(
             model, test_slots, test_targets)
 
-        B, S, D = train_slots.shape
+        B_train, S, D = train_slots.shape
+        B_test = test_slots.shape[0]
+        B = B_train + B_test
 
         if self.simultaneous_projection:
             all_embeddings = np.concatenate([train_slots, test_slots], axis=0)
-            manifold = self.dim_reduction.fit_transform(
-                all_embeddings.astype(np.double).reshape(-1, D)
+            all_targets = np.concatenate([train_targets, test_targets], axis=0)
+
+            manifold, projected_targets = self.dim_reduction.fit_transform(
+                all_embeddings.reshape(-1, D),
+                all_targets,
             )
 
-            if self.subsample > 0:
-                B = self.subsample
+            y_rots = self.dim_reduction.y_rotations_
+            # print(self.dim_reduction.x_rotations_)
+            # shape_proj_idx, rotation_proj_idx = np.abs(y_rots[[0, 3]]).argmax(axis=1)
+            shape_idxs = np.argsort(np.abs(y_rots)[0])[::-1]
+            rotation_idxs = np.argsort(np.abs(y_rots)[3])[::-1]
 
-            manifold = manifold.reshape(2 * B , S, -1)
-            train_manifold, test_manifold = manifold[:B], manifold[B:]
+            print(y_rots)
+            print(shape_idxs)
+            print(rotation_idxs)
 
+            idx_1, idx_2, idx_3 = shape_idxs[:3]
+
+            # if self.subsample > 0:
+            #     B = self.subsample
+
+            manifold = manifold.reshape(B , S, -1)[:, :, [idx_1, idx_2, idx_3]]
+            # projected_targets = projected_targets[:, [shape_proj_idx, rotation_proj_idx]]
+            train_manifold, test_manifold = manifold[:B_train], manifold[B_train:]
+
+            print(train_manifold.shape)
+            print(test_manifold.shape)
         else:
             raise NotImplementedError()
             # train_manifold = self.dim_reduction.fit_transform(train_slots)
             # test_manifold = self.dim_reduction.transform(test_slots)
+
+        if self.subsample > 0:
+            train_manifold, train_targets, test_manifold, test_targets = subsample(
+                train_manifold, train_targets, test_manifold, test_targets,
+                n_samples=self.subsample
+            )
 
         return train_manifold, train_targets, test_manifold, test_targets
 
