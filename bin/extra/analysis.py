@@ -69,7 +69,6 @@ class Analysis:
             figure = viz(self.model, self.datamodule)
             self.logger.log_visualisation(figure)
 
-
     @torch.no_grad()
     def score(self, engine, loader):
         metrics = engine.run(loader).metrics

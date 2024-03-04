@@ -1,3 +1,4 @@
+import os.path  as osp
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Literal, Optional
 
@@ -11,6 +12,7 @@ import pytorch_lightning as pl
 from torch.utils.data.dataloader import DataLoader
 from skimage import color
 
+from src.analysis.hinton import IndexLocator
 from .utils import (
     IndexSelector,
     OutputSelector,
@@ -344,163 +346,221 @@ class SlotReconstruction(Visualzation):
         strip_plot(ax)
 
 
-class SlotRepresentation(ReconstructionViz):
+class PerceptualGroupingLatentProjection(ReconstructionViz):
     def __init__(
         self,
-        dimensionality_reduction: Callable,
+        factor_dim: int,  # A factor we wish to plot in 3D. TODO: This could be a list
+        comparison_factor_1: int,  # Factors to compare in 2D plot.
+        comparison_factor_2: int,  # TODO: These two could be lists to plot several combinations
+        dimensionality_reduction: Callable,  # this will be PSL but I am keeping it as a parameter
+        n_proj_dims: int = 3,  # the number of dimnensios used for the representation
         simultaneous_projection: bool = True,
         subsample: int = 10000,
         name: str = "projection",
+        load_computed_outputs: bool = False,
+        save_folder: Optional[str] = None,
     ) -> None:
         super().__init__()
+        self.factor_dim = factor_dim
+        self.comparison_factor_1 = comparison_factor_1
+        self.comparison_factor_2 = comparison_factor_2
+        self.n_proj_dims = n_proj_dims
         self.dim_reduction = dimensionality_reduction
         self.simultaneous_projection = simultaneous_projection
         self.subsample = subsample
         self.name = name
+        self.load_computed_outputs = load_computed_outputs
+        self.save_folder = save_folder
         # self.slot_selection_fn = slot_selection_fn
 
     def __call__(self, model, dataset):
         return self.create_figure(model, dataset)
 
     def create_figure(self, model, dataset):
-        train_embeddings = compute_embeddings(
-            model, dataset.val_dataloader()
+        if self.load_computed_outputs and self.save_folder is not None:
+           (
+                train_embeddings,
+                train_targets,
+                test_embeddings,
+                test_targets,
+           ) = self.load_outputs()
+        else:
+            train_embeddings, train_targets = compute_embeddings(
+                model, dataset.val_dataloader()
+            )
+            test_embeddings, test_targets = compute_embeddings(
+                model, dataset.test_dataloader()
+            )
+
+        slot_idx = self.select_slot(model, train_embeddings, train_targets)
+
+        train_embeddings = train_embeddings[:, slot_idx].numpy()
+        test_embeddings = test_embeddings[:, slot_idx].numpy()
+        train_targets = train_targets.numpy()
+        test_targets = test_targets.numpy()
+
+        self.fit_dim_reduction((train_embeddings, train_targets), (test_embeddings, test_targets))
+
+        if self.subsample > 0:
+            subsample_idx = np.random.choice(len(train_embeddings), size=self.subsample, replace=False)
+            train_embeddings = train_embeddings[subsample_idx]
+            train_targets = train_targets[subsample_idx]
+
+            subsample_idx = np.random.choice(len(test_embeddings), size=self.subsample, replace=False)
+            test_embeddings = test_embeddings[subsample_idx]
+            test_targets = test_targets[subsample_idx]
+
+        embedding_params_plot = self.plot_dim_reduction_params(dataset)
+        latent_projection_plot = self.factor_projection(train_embeddings, test_embeddings)
+        factor_comparison_plot = self.two_factor_comparison(
+            dataset, train_embeddings, train_targets, test_embeddings, test_targets
         )
 
-        test_embeddings = compute_embeddings(
-            model, dataset.test_dataloader()
-        )
+        return [
+            ("weight_values", embedding_params_plot),
+            ("latent_projection", latent_projection_plot),
+            ("factor_comparison", factor_comparison_plot),
+        ]
 
-        (
-            train_manifold,
-            train_targets,
-            test_manifold,
-            test_targets,
-        ) = self.transform(train_embeddings, test_embeddings, model)
+    def plot_dim_reduction_params(self, dataset):
+        factor_labels = dataset.dataset_cls.factors
 
-        return self.name, self.plot(
-            train_manifold, train_targets, test_manifold, test_targets
-        )
+        # currently we are only interested in the y rotations, i.e. the weights that signal how
+        # each dimension in the projection space contributes to representing the generative factor
+        # space.
+        y_rotations_ = self.dim_reduction.y_rotations_
+        latent_contribution = np.abs(y_rotations_)  # shape (n_factors, n_dims)
 
-    def plot(self, train_manifold, train_targets, test_manifold, test_targets):
-        train_manifold = np.transpose(train_manifold, (1, 0, 2))
-        test_manifold = np.transpose(test_manifold, (1, 0, 2))
+        fig = plt.figure(figsize=(10, 10))  # should be n_factors == n_dims
+        ax = fig.add_subplot()
+
+        ax.imshow(latent_contribution)
+
+        ax.spines['bottom'].set_color('black')
+        ax.spines['top'].set_color('black')
+        ax.spines['right'].set_color('black')
+        ax.spines['left'].set_color('black')
+
+        ax.set_xlabel('factors', fontsize=20)
+        ax.set_ylabel('latents', fontsize=20)
+
+        ax.xaxis.set_major_locator(IndexLocator())
+        ax.yaxis.set_major_locator(IndexLocator())
+
+        ax.set_yticks(range(len(factor_labels)))
+        ax.set_yticklabels(factor_labels)
+
+        return  fig
+
+    def factor_projection(
+        self,
+        train_manifold,
+        test_manifold,
+    ):
+        y_rotations_ = self.dim_reduction.y_rotations_[self.factor_dim]
+        index_dims = np.argsort(np.abs(y_rotations_))[-self.n_proj_dims:]
+
+        train_manifold = train_manifold[:, index_dims]
+        test_manifold = test_manifold[:, index_dims]
 
         # n_slots = train_manifold.shape[0]
         angles = list(range(0, 360, 60))
-
         fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 10), subplot_kw={'projection':'3d'})
-        # axes = [fig.add_subplot(1, len(angles), i + 1, projection='3d') for i in range(len(angles))]
 
         # if not isinstance(axes, np.ndarray):
         #     axes = [axes]
 
-        proj_train = train_manifold.squeeze()
-        proj_test = test_manifold.squeeze()
         for ang, ax in zip(angles, axes.ravel()):
-            ax.scatter(*proj_train.T, color='k')
-            ax.scatter(*proj_test.T, color='r', marker='x')
+            ax.scatter(*train_manifold.T, color='k')
+            ax.scatter(*test_manifold.T, color='r', marker='x')
             ax.view_init(azim=ang)
-
-        # for proj, ax in zip(train_manifold, axes):
-        #     if proj.shape[1] == 2:
-        #         x, y = proj.T
-        #         ax.scatter(x, y, color='k')
-
-        #     elif proj.shape[1] == 3:
-        #         x, y, z = proj.T
-        #         ax.scatter(x, y, z, color='k')
-
-        # for proj, ax in zip(test_manifold, axes):
-        #     if proj.shape[1] == 2:
-        #         x, y = proj.T
-        #         ax.scatter(x, y, color='r', marker='x')
-
-        #     elif proj.shape[1] == 3:
-        #         x, y, z = proj.T
-        #         ax.scatter(x, y, z, color='r', marker='x')
-        #         ax.view_init(azim=-150)
-
-        # for ax in axes:
-        #     strip_plot(ax)
 
         return fig
 
-    def transform(self, train_embeddings, test_embeddings, model):
-        train_slots, train_targets = train_embeddings
-        test_slots, test_targets = test_embeddings
+    def two_factor_comparison(
+        self,
+        dataset,
+        train_manifold,
+        train_targets,
+        test_manifold,
+        test_targets
+    ):
+        train_predictions = self.dim_reduction.predict(train_manifold)
+        test_predictions = self.dim_reduction.predict(test_manifold)
 
-        # Extract the slot that is representing the relevant object
-        train_slots, train_targets = self.select_slot(
-            model, train_slots, train_targets)
+        factor_idxs = [self.comparison_factor_1, self.comparison_factor_2]
+        all_factors = dataset.dataset_cls.factors
+        factors = all_factors[self.comparison_factor_1], all_factors[self.comparison_factor_2]
 
-        test_slots, test_targets = self.select_slot(
-            model, test_slots, test_targets)
+        train_predictions = train_predictions[:, factor_idxs]
+        test_predictions = test_predictions[:, factor_idxs]
+        train_targets =  train_targets[:, factor_idxs]
+        test_targets =  test_targets[:, factor_idxs]
 
-        B_train, S, D = train_slots.shape
-        B_test = test_slots.shape[0]
-        B = B_train + B_test
+        train_scores = ((train_predictions - train_targets) ** 2).mean(axis=0)
+        test_scores = ((test_predictions - test_targets) ** 2).mean(axis=0)
+
+        fig, (ax_pred, ax_scores) = plt.subplots(ncols=2, figsize=(20, 10))
+
+        ax_pred.scatter(*train_predictions.T, color='k')
+        ax_pred.scatter(*test_predictions.T, color='r', marker='x')
+
+        ax_pred.set_xlabel(dataset.dataset_cls.factors[self.comparison_factor_1])
+        ax_pred.set_ylabel(dataset.dataset_cls.factors[self.comparison_factor_2])
+
+        bar_width = 0.25
+        x = np.arange(len(factors))
+        data_splits = ["train", "test"]
+
+        for i, (split, scores) in enumerate(zip(data_splits, [train_scores, test_scores])):
+            offset = bar_width * i
+            rects = ax_scores.bar(x + offset, scores, bar_width, label=split)
+            ax_scores.bar_label(rects, padding=3)
+
+        ax_scores.set_xticks(x / 2 + bar_width, factors)
+        ax_scores.legend(loc='upper left', ncols=3)
+
+        return fig
+
+    def fit_dim_reduction(self, train_data, test_data):
+        train_slots, train_targets = train_data
+        test_slots, test_targets = test_data
 
         if self.simultaneous_projection:
             all_embeddings = np.concatenate([train_slots, test_slots], axis=0)
             all_targets = np.concatenate([train_targets, test_targets], axis=0)
-
-            manifold, projected_targets = self.dim_reduction.fit_transform(
-                all_embeddings.reshape(-1, D),
-                all_targets,
-            )
-
-            y_rots = self.dim_reduction.y_rotations_
-            # print(self.dim_reduction.x_rotations_)
-            # shape_proj_idx, rotation_proj_idx = np.abs(y_rots[[0, 3]]).argmax(axis=1)
-            shape_idxs = np.argsort(np.abs(y_rots)[0])[::-1]
-            rotation_idxs = np.argsort(np.abs(y_rots)[3])[::-1]
-
-            print(y_rots)
-            print(shape_idxs)
-            print(rotation_idxs)
-
-            idx_1, idx_2, idx_3 = shape_idxs[:3]
-
-            # if self.subsample > 0:
-            #     B = self.subsample
-
-            manifold = manifold.reshape(B , S, -1)[:, :, [idx_1, idx_2, idx_3]]
-            # projected_targets = projected_targets[:, [shape_proj_idx, rotation_proj_idx]]
-            train_manifold, test_manifold = manifold[:B_train], manifold[B_train:]
-
-            print(train_manifold.shape)
-            print(test_manifold.shape)
+            self.dim_reduction.fit(all_embeddings, all_targets)
         else:
-            raise NotImplementedError()
-            # train_manifold = self.dim_reduction.fit_transform(train_slots)
-            # test_manifold = self.dim_reduction.transform(test_slots)
+            self.dim_reduction.fit(train_slots, train_targets)
 
-        if self.subsample > 0:
-            train_manifold, train_targets, test_manifold, test_targets = subsample(
-                train_manifold, train_targets, test_manifold, test_targets,
-                n_samples=self.subsample
-            )
+    def save_outputs(self, train_embeddings, train_targets, test_embeddings, test_targets):
+        assert self.save_folder is not None
+        file = osp.join(self.save_folder, "computed_projection.npz")
+        np.savez(
+            file,
+            train_embeddings=train_embeddings,
+            train_targets=train_targets,
+            test_embeddings=test_embeddings,
+            test_targets=test_targets
+        )
 
-        return train_manifold, train_targets, test_manifold, test_targets
+    def load_outputs(self):
+        assert self.save_folder is not None
+
+        file = osp.join(self.save_folder, "computed_projection.npz")
+        data_zip = np.load(file, allow_pickle=True)
+
+        train_embeddings = data_zip['train_embeddings']
+        test_embeddings = data_zip['test_embeddings']
+        train_targets = data_zip['train_targets']
+        test_targets = data_zip['test_targets']
+
+        return train_embeddings, train_targets, test_embeddings, test_targets
 
     @torch.no_grad()
     def select_slot(self, model, inputs, targets):
-        # assignments = []
-        # idx = 0
-
-        # for x, y in zip(inputs, targets):
-        #     x, y = x[None].to(device=model.device), y[None].to(device=model.device)
-
-        #     a = model.slot_assignment(x, y)
-
-        #     assignments.append(a)
-
-        # return torch.cat(assignments)[:, [idx]], targets[:, [idx]]
-
-        # assume there is only one slot
-        print(inputs.shape)
-        return inputs[:, [0]], targets
+        # currently assuming that this is a figure-ground segmentation model with only one slot
+        return 0
 
 
 class TraversalReconstruction(Visualzation):
