@@ -63,3 +63,12 @@
 #   logger.figure_logger.name="test_set"
 
 
+#--------------- Model trained with one excluded shapa, teseted on cannonical rotation -----------
+
+
+FG_SEG_MODEL=data/logs/unsupervised/pentominos/fgseg/new_shape/2023-09-24_13-17
+
+python -m bin.analyze analysis=slot_recons \
+  run_path=$FG_SEG_MODEL \
+  visualizations.slot_representation \
+  +overrides.dataset.{split_condition=extrap,split_variant=rotated_cannonical_shape}

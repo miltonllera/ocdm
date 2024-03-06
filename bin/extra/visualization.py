@@ -12,7 +12,7 @@ import pytorch_lightning as pl
 from torch.utils.data.dataloader import DataLoader
 from skimage import color
 
-from src.analysis.hinton import IndexLocator
+from src.analysis.hinton import IndexLocator, hinton
 from .utils import (
     IndexSelector,
     OutputSelector,
@@ -434,21 +434,23 @@ class PerceptualGroupingLatentProjection(ReconstructionViz):
         fig = plt.figure(figsize=(10, 10))  # should be n_factors == n_dims
         ax = fig.add_subplot()
 
-        ax.imshow(latent_contribution)
+        hinton(latent_contribution.T, factor_labels=factor_labels, ax=ax, fontsize=20)
 
-        ax.spines['bottom'].set_color('black')
-        ax.spines['top'].set_color('black')
-        ax.spines['right'].set_color('black')
-        ax.spines['left'].set_color('black')
+        # ax.imshow(latent_contribution)
 
-        ax.set_xlabel('factors', fontsize=20)
-        ax.set_ylabel('latents', fontsize=20)
+        # ax.spines['bottom'].set_color('black')
+        # ax.spines['top'].set_color('black')
+        # ax.spines['right'].set_color('black')
+        # ax.spines['left'].set_color('black')
 
-        ax.xaxis.set_major_locator(IndexLocator())
-        ax.yaxis.set_major_locator(IndexLocator())
+        # ax.set_xlabel('latents', fontsize=20)
+        # ax.set_ylabel('factors', fontsize=20)
 
-        ax.set_yticks(range(len(factor_labels)))
-        ax.set_yticklabels(factor_labels)
+        # ax.xaxis.set_major_locator(IndexLocator())
+        # ax.yaxis.set_major_locator(IndexLocator())
+
+        # ax.set_yticks(range(len(factor_labels)))
+        # ax.set_yticklabels(factor_labels)
 
         return  fig
 

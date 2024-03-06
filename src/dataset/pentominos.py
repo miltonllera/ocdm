@@ -129,6 +129,7 @@ class Pentominos(Dataset):
                 'new_shape': _masks.new_shape,
                 'three_new_shapes': _masks.three_new_shapes,
                 'half_new_shapes': _masks.half_new_shapes,
+                'rotated_cannonical_shape': _masks.rotated_cannonical_shape,
             }
         }
 
@@ -265,5 +266,25 @@ class _masks:
 
         def train_mask(factor_values, factor_classes):
             return ~test_mask(factor_values, factor_classes)
+
+        return train_mask, test_mask
+
+    @class_property
+    def rotated_cannonical_shape(cls):
+        def test_mask(factor_values, factor_classes):
+            return (
+                factor_values[:, cls.shp] == 8 &
+                factor_values[:, cls.scl] == 3 &
+                factor_classes[:, cls.tx] == 10 &
+                factor_classes[:, cls.ty] == 10
+            )
+
+        def train_mask(factor_values, factor_classes):
+            return (
+                factor_values[:, cls.shp] != 8 &
+                factor_values[:, cls.scl] == 3 &
+                factor_classes[:, cls.tx] == 10 &
+                factor_classes[:, cls.ty] == 10
+            )
 
         return train_mask, test_mask
