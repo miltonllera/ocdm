@@ -436,22 +436,6 @@ class PerceptualGroupingLatentProjection(ReconstructionViz):
 
         hinton(latent_contribution.T, factor_labels=factor_labels, ax=ax, fontsize=20)
 
-        # ax.imshow(latent_contribution)
-
-        # ax.spines['bottom'].set_color('black')
-        # ax.spines['top'].set_color('black')
-        # ax.spines['right'].set_color('black')
-        # ax.spines['left'].set_color('black')
-
-        # ax.set_xlabel('latents', fontsize=20)
-        # ax.set_ylabel('factors', fontsize=20)
-
-        # ax.xaxis.set_major_locator(IndexLocator())
-        # ax.yaxis.set_major_locator(IndexLocator())
-
-        # ax.set_yticks(range(len(factor_labels)))
-        # ax.set_yticklabels(factor_labels)
-
         return  fig
 
     def factor_projection(
@@ -487,25 +471,43 @@ class PerceptualGroupingLatentProjection(ReconstructionViz):
         test_manifold,
         test_targets
     ):
-        train_predictions = self.dim_reduction.predict(train_manifold)
-        test_predictions = self.dim_reduction.predict(test_manifold)
+        train_manifold_proj, train_targets_proj = self.dim_reduction.transform(
+            train_manifold, train_targets
+        )
 
-        factor_idxs = [self.comparison_factor_1, self.comparison_factor_2]
+        test_manifold_proj, test_targets_proj = self.dim_reduction.transform(
+            test_manifold, test_targets
+        )
+
+        y_rotations_ = self.dim_reduction.y_rotations_
+        index_dims = np.argsort(np.abs(y_rotations_), axis=1)[
+            [self.comparison_factor_1, self.comparison_factor_2], -1
+        ]
+
+        train_manifold_proj = train_manifold_proj[:, index_dims]
+        train_targets_proj = train_targets_proj[:, index_dims]
+
+        test_manifold_proj = test_manifold_proj[:, index_dims]
+        test_targets_proj = test_targets_proj[:, index_dims]
+
+        # train_predictions = self.dim_reduction.predict(train_manifold)
+        # test_predictions = self.dim_reduction.predict(test_manifold)
+
         all_factors = dataset.dataset_cls.factors
         factors = all_factors[self.comparison_factor_1], all_factors[self.comparison_factor_2]
 
-        train_predictions = train_predictions[:, factor_idxs]
-        test_predictions = test_predictions[:, factor_idxs]
-        train_targets =  train_targets[:, factor_idxs]
-        test_targets =  test_targets[:, factor_idxs]
+        # train_predictions = train_predictions[:, factor_idxs]
+        # test_predictions = test_predictions[:, factor_idxs]
+        # train_targets =  train_targets[:, factor_idxs]
+        # test_targets =  test_targets[:, factor_idxs]
 
-        train_scores = ((train_predictions - train_targets) ** 2).mean(axis=0)
-        test_scores = ((test_predictions - test_targets) ** 2).mean(axis=0)
+        train_scores = ((train_manifold_proj - train_targets_proj) ** 2).mean(axis=0)
+        test_scores = ((test_targets_proj - test_targets_proj) ** 2).mean(axis=0)
 
         fig, (ax_pred, ax_scores) = plt.subplots(ncols=2, figsize=(20, 10))
 
-        ax_pred.scatter(*train_predictions.T, color='k')
-        ax_pred.scatter(*test_predictions.T, color='r', marker='x')
+        ax_pred.scatter(*train_manifold_proj.T, color='k')
+        ax_pred.scatter(*test_manifold_proj.T, color='r', marker='x')
 
         ax_pred.set_xlabel(dataset.dataset_cls.factors[self.comparison_factor_1])
         ax_pred.set_ylabel(dataset.dataset_cls.factors[self.comparison_factor_2])
