@@ -22,6 +22,19 @@ from .utils import (
 )
 
 
+def strip_plot(ax):
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
 class Visualzation(ABC):
     def __call__(self, model, datamodule) -> Any:
         return self.create_figure(model, datamodule)
@@ -506,8 +519,15 @@ class PerceptualGroupingLatentProjection(ReconstructionViz):
 
         fig, (ax_pred, ax_scores) = plt.subplots(ncols=2, figsize=(20, 10))
 
-        ax_pred.scatter(*train_manifold_proj.T, color='k')
+        ax_pred.scatter(*train_manifold_proj.T, color='k', marker='x')
         ax_pred.scatter(*test_manifold_proj.T, color='r', marker='x')
+        ax_pred.scatter(*train_targets_proj.T, color='k', marker='o')
+        ax_pred.scatter(*test_targets_proj.T, color='r', marker='o')
+
+        print(test_targets_proj.shape)
+        print(test_manifold_proj.shape)
+        print(train_targets_proj.shape)
+        print(train_manifold_proj.shape)
 
         ax_pred.set_xlabel(dataset.dataset_cls.factors[self.comparison_factor_1])
         ax_pred.set_ylabel(dataset.dataset_cls.factors[self.comparison_factor_2])
@@ -716,16 +736,3 @@ def colorize(masks):
             masks[i, j] = tint(masks[i, j], h)
 
     return masks
-
-
-def strip_plot(ax):
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-
-    ax.set_xlabel('')
-    ax.set_ylabel('')
-
-    ax.set_xticks([])
-    ax.set_yticks([])

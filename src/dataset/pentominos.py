@@ -110,6 +110,8 @@ class Pentominos(Dataset):
             factor_values = factor_values[idx]
             factor_classes = factor_classes[idx]
 
+            print(len(image_files))
+
             if len(image_files) == 0:
                 raise ValueError("Condition filter removed all data")
 
@@ -273,18 +275,18 @@ class _masks:
     def rotated_cannonical_shape(cls):
         def test_mask(factor_values, factor_classes):
             return (
-                factor_values[:, cls.shp] == 8 &
-                factor_values[:, cls.scl] == 3 &
-                factor_classes[:, cls.tx] == 10 &
-                factor_classes[:, cls.ty] == 10
+                (factor_values[:, cls.shp] == 8) &
+                (factor_values[:, cls.scl] == 3) &
+                (factor_classes[:, cls.tx] == 10) &
+                (factor_classes[:, cls.ty] == 10)
             )
 
         def train_mask(factor_values, factor_classes):
             return (
-                factor_values[:, cls.shp] != 8 &
-                factor_values[:, cls.scl] == 3 &
-                factor_classes[:, cls.tx] == 10 &
-                factor_classes[:, cls.ty] == 10
+                (factor_values[:, cls.shp] == 1) &
+                (factor_values[:, cls.scl] == 3) &
+                (factor_classes[:, cls.tx] == 10) &
+                (factor_classes[:, cls.ty] == 10)
             )
 
         return train_mask, test_mask
