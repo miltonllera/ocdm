@@ -21,8 +21,9 @@ def split_heads(input: Tensor, n_heads: int) -> Tensor:
     """
     Split slots into n heads and set them to dimension 1.
     """
-    # input size: B, n_in, slot_size/input_size
+    # input size: B, N_in, (slot_size or input_size)
     split_size = input.shape[-1] // n_heads
+    # output size B, H, N_in, I_s // H
     return input.unflatten(-1, (n_heads, split_size)).transpose(1, 2)
 
 
@@ -135,8 +136,11 @@ class SlotAttention(nn.Module):
     def compute_attention_maps(self, k, q, v):
         q = split_heads(q, self.nhead)
 
-        weights = k @ q.transpose(2, 3)  # n_inputs, n_slots
+        # k: b, h, n_in, e; q: b, h, s, e
+        weights = k @ q.transpose(2, 3)  # b, h, n_inputs, n_slots
+        # softmax over slots and heads
         weights = F.softmax(join_heads(weights), dim=-1)
+        # split back to b, h, n_in, s
         weights = split_heads(weights, self.nhead) + EPS
         weights = weights / weights.sum(dim=-2, keepdim=True)
 

@@ -11,14 +11,10 @@ dataset:
   path: data/datasets/shapes3d/3dshapes.h5
   held_out_filter: "( shape == 3 ) & ( object_hue > 0.5 )"  # NOTE: parenthesis are important
   rebalance_dim: shape
-  # color_format: rgb
-  # Performance stuff
-  # num_worker: 4
-  # val_split: 0.2
 
 # Model configuration
 model:
-  _target_: src.model.autoencoder.WassersteinMMDAE
+  _target_: src.model.vae.WassersteinMMDAE
   input_size: [3, 64, 64]  # channels, height, width (RGB)
 
   # Encoder layers configuration
@@ -51,9 +47,9 @@ model:
   # WAE parameters
   latent_size: 10
   lambda1: 10.0
-  lambda2: 1.0
+  lambda2: 0.001
   prior_type: norm
-  prior_var: 1.0
+  prior_var: 2.0
 
 # Training configuration
 training:
@@ -66,14 +62,14 @@ training:
     warmup:
       _target_: torch.optim.lr_scheduler.LinearLR
       start_factor: 0.1
-      total_iters: 1000
+      total_iters: 10_000
 
   scheduling_metric: val/loss
 
 # Trainer configuration
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_steps: 100_000
+  max_steps: 500_000
   gradient_clip_val: 1.0
   accelerator: auto
   devices: auto

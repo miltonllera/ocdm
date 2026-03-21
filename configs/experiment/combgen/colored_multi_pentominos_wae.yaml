@@ -1,0 +1,89 @@
+# @package _global_
+
+condition_name: combgen_colored_multi_pentominos
+model_name: wae
+test: true
+
+# Dataset configuration to load the custom colored multi-shape dataset
+dataset:
+  _target_: src.dataset.pentominos.Pentominos
+  prediction_type: multi_shape
+  n_shapes: 2
+  num_colors: 10
+  held_out_filter: "np.isin( shape , [1,2,3,4,5,6,7,8,10] ) & ( angle >= 180 )"
+  filter_fn: null
+  batch_size: 64
+  num_workers: 0  # Force to 0 for macOS spawn start method compatibility
+  path: data/datasets/pentominos/
+
+# Model configuration
+model:
+  _target_: src.model.vae.WassersteinMMDAE
+  input_size: [3, 64, 64]  # 3 channels (RGB), 64x64 resolution
+
+  # Encoder layers configuration
+  encoder_config:
+    - [conv, [32, 4, 2, 1]]
+    - [relu]
+    - [conv, [32, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [flatten]
+    - [linear, [256]]
+    - [relu]
+
+  # Decoder layers configuration
+  decoder_config:
+    - [linear, [256]]
+    - [relu]
+    - [unflatten, [1, [16, 4, 4]]]
+    - [tconv, [64, 4, 2, 1]]
+    - [relu]
+    - [tconv, [32, 4, 2, 1]]
+    - [relu]
+    - [tconv, [32, 4, 2, 1]]
+    - [relu]
+    - [tconv, ["${model.input_size.0}", 4, 2, 1]]  # Reconstructs RGB image (3 channels)
+
+  # WAE parameters
+  latent_size: 64
+  lambda1: 10.0
+  lambda2: 0.001
+  prior_type: norm
+  prior_var: 2.0
+
+# Training configuration
+training:
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: 0.001
+
+  schedulers:
+    exponential:
+      _target_: src.training.scheduler.ExponentialLR
+      _partial_: true
+      gamma: 0.99999653  # 0.5 ** (1 / 200000)
+      decay_groups: null
+    warmup:
+      _target_: src.training.scheduler.WarmupLR
+      _partial_: true
+      start_value: 0.0
+      warmup_steps: 3000
+
+  scheduling_metric: val/loss
+
+# Trainer configuration
+trainer:
+  _target_: lightning.pytorch.Trainer
+  max_steps: 500_000
+  gradient_clip_val: 1.0
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 10
+  val_check_interval: 5000
+  check_val_every_n_epoch: null
+  fast_dev_run: false
+  default_root_dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}

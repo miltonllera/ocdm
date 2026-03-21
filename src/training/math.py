@@ -3,6 +3,7 @@ import numpy as np
 from itertools import product, combinations
 from torch.nn.functional import huber_loss
 
+
 def gauss2standard_kl(mean, logvar):
     return -0.5 * (1 + logvar - mean.pow(2) - logvar.exp())
 

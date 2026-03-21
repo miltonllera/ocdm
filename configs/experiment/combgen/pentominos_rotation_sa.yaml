@@ -1,6 +1,6 @@
 # @package _global_
 
-condition_name: combgen_pentominos_rotation
+condition_name: combgen_pentominos_rotation_9_shapes
 model_name: sa
 test: true
 
@@ -9,7 +9,8 @@ dataset:
   _target_: src.dataset.pentominos.Pentominos
   path: data/datasets/pentominos/
   prediction_type: unsupervised
-  held_out_filter: "np.isin( shape , [1, 6, 8, 10] ) & ( angle >= 180 )"
+  # held_out_filter: "np.isin( shape , [4, 5, 6, 8,] ) & ( angle >= 180 )"
+  held_out_filter: "np.isin( shape, [1,2,3,4,5,6,7,8,10] ) & ( angle >= 180 )"
   rebalance_dim: shape
 
   # Performance stuff
@@ -18,32 +19,30 @@ dataset:
 
 # Model configuration
 model:
-  _target_: src.model.grouping.FigureGroundAutoencoder
+  _target_: src.model.slot.FigureGroundAutoencoder
   input_size: [1, 64, 64]  # channels, height, width (assuming grayscale, will adapt based on data)
 
   # Encoder layers configuration
   encoder_config:
-    - [conv, [64, 4, 2, 1]]
+    - [conv, [32, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
+    - [relu]
+    - [conv, [32, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
     - [conv, [64, 4, 2, 1]]
-    - [relu]
-    - [permute, [0, 2, 3, 1]]
-    - [posemb2d, {embed: cardinal}]
-    - [flatten, [1, 2]]
-    - [layer_norm, [-1]]
-    - [linear, [64]]
     - [relu]
 
   # Decoder layers configuration
   decoder_config:
-    - [spatbroad, [8, 8], {input_last: True}]
-    - [posemb2d, {embed: cardinal}]
-    - [permute, [0, 3, 1, 2]]
+    - [linear, [256]]
+    - [relu]
+    - [unflatten, [1, [16, 4, 4]]]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
-    - [tconv, [64, 4, 2, 1]]
+    - [tconv, [32, 4, 2, 1]]
+    - [relu]
+    - [tconv, [32, 4, 2, 1]]
     - [relu]
     - [tconv, [2, 4, 2, 1]]
 
@@ -53,12 +52,13 @@ model:
   slot_channels: 1
   slot_hidden_size: 128
   approx_implicit_grad: false
+  use_wasserstein_reg: True
 
 # Training configuration
 training:
   optimizer:
     _target_: torch.optim.Adam
-    lr: 0.001
+    lr: 0.0003
 
   schedulers:
     exponential:
@@ -71,7 +71,7 @@ training:
       _target_: src.training.scheduler.WarmupLR
       _partial_: true
       start_value: 0.0
-      warmup_steps: 30_000
+      warmup_steps: 3_000
 
   scheduling_metric: val/loss
 
@@ -86,4 +86,4 @@ trainer:
   val_check_interval: 5000
   check_val_every_n_epoch: null
   fast_dev_run: false
-  default_root_dir: ${paths.log_dir}/figure2/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
+  default_root_dir: ${paths.log_dir}/test_arch_diffs/refactor_slot/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}

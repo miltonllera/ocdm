@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from src.nn.init import weights_init
-from src.nn.stochastic import DiagonalGaussian, GumbelSoftmax
+from src.nn.stochastic import DiagonalGaussian
 from src.nn.utils.parsing import create_sequential
 from src.training.loss import (
     ReconstructionLoss,
@@ -26,18 +26,14 @@ class VariationalAutoencoder(BaseModel):
         encoder_config: list,
         decoder_config: list,
         training: TrainingInit,
-        # Latent space parameters
         latent_size: int = 10,
-        # Reconstruction loss parameters
         recons_loss: Literal["bce", "mse", "l1"] = "mse",
     ):
         super().__init__(training)
         self.save_hyperparameters()
 
-        # Build encoder from config
         self.encoder = create_sequential(input_size, encoder_config)
 
-        # Get encoder output size for latent layer input
         with torch.no_grad():
             if isinstance(input_size, int):
                 dummy_input = torch.zeros(1, input_size)
@@ -46,13 +42,8 @@ class VariationalAutoencoder(BaseModel):
             encoder_output = self.encoder(dummy_input)
             encoder_output_size = encoder_output.shape[-1]
 
-        # Build latent layer (DiagonalGaussian) with explicit parameters
         self.latent = DiagonalGaussian(encoder_output_size, latent_size)
-
-        # Build decoder from config
         self.decoder = create_sequential(latent_size, decoder_config)
-
-        # Reconstruction loss
         self.recons_loss = ReconstructionLoss(recons_loss)
 
         self.reset_parameters()
@@ -78,11 +69,10 @@ class VariationalAutoencoder(BaseModel):
 
     @abstractmethod
     def _compute_latent_loss(
-            self,
-            z: torch.Tensor,
-            z_params: tuple[torch.Tensor, torch.Tensor]
+        self,
+        z: torch.Tensor,
+        z_params: tuple[torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
-        """Compute the latent space loss (KL, MMD, adversarial, etc.)"""
         raise NotImplementedError
 
     def _step(
@@ -116,7 +106,6 @@ class VariationalAutoencoder(BaseModel):
         return loss if is_train else recons_loss
 
     def predict(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Generate predictions without gradients."""
         return self.forward(inputs)[1]
 
     def reconstruction(self, inputs: torch.Tensor):
@@ -132,15 +121,11 @@ class BetaVAE(VariationalAutoencoder):
         encoder_config: list,
         decoder_config: list,
         training: TrainingInit,
-        # Latent space parameters
         latent_size: int = 10,
-        # KL loss parameters
         beta: float = 1.0,
         beta_schedule: tuple[int, str, float] | None = None,
     ):
         super().__init__(input_size, encoder_config, decoder_config, training, latent_size, "bce")
-
-        # KL divergence loss
         self.latent_loss_fn = GaussianKL(beta=beta, beta_schedule=beta_schedule)
 
     def _compute_latent_loss(
@@ -148,23 +133,9 @@ class BetaVAE(VariationalAutoencoder):
         z: torch.Tensor,
         z_params: tuple[torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        kl_loss = self.latent_loss_fn(z, z_params)
-        # Log additional metrics for β-VAE
-        # self.log("kl_loss", kl_loss, on_step=True, on_epoch=True, prog_bar=False, sync_dist=True)
-        # self.log("beta", self.latent_loss_fn.beta, on_step=True, on_epoch=False, prog_bar=False)
-        # if hasattr(self.latent_loss_fn, 'anneal'):
-        #     self.log(
-        #         "anneal",
-        #         self.latent_loss_fn.anneal,
-        #         on_step=True,
-        #         on_epoch=False,
-        #         prog_bar=False
-        #     )
-
-        return kl_loss
+        return self.latent_loss_fn(z, z_params)
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
-        """Update β schedule if applicable."""
         if isinstance(self.latent_loss_fn, UpdatableLoss):
             self.latent_loss_fn.update_parameters(self.global_step)
 
@@ -181,10 +152,8 @@ class WassersteinAE(VariationalAutoencoder):
         encoder_config: list,
         decoder_config: list,
         training: TrainingInit,
-        # Latent space parameters
         latent_size: int = 10,
         use_discrete: bool = True,
-        # Wasserstein adversarial loss parameters
         lambda1: float = 10.0,
         lambda2: float = 0.0,
         prior_var: float = 1.0,
@@ -193,8 +162,6 @@ class WassersteinAE(VariationalAutoencoder):
         optimizer_fn: Callable | None = None,
     ):
         super().__init__(input_size, encoder_config, decoder_config, training, latent_size, "mse")
-
-        # Wasserstein adversarial loss
         self.use_discrete = use_discrete
         self.latent_loss_fn = WassersteinAdversarial(
             lambda1=lambda1,
@@ -211,39 +178,20 @@ class WassersteinAE(VariationalAutoencoder):
             z_params: tuple[torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
         if self.use_discrete:
-            z = z_params[0]  # discrete latents just use a mean-field approximation
-        adv_loss = self.latent_loss_fn(z, z_params)
-
-        # Log additional metrics
-        # self.log("adversarial_term", adv_loss, on_step=True, on_epoch=True, prog_bar=False)
-        # self.log(
-        #     "lambda1", self.latent_loss_fn.lambda1, on_step=True, on_epoch=False, prog_bar=False
-        # )
-        # if hasattr(self.latent_loss_fn, 'anneal'):
-        #     self.log(
-        #         "anneal",
-        #         self.latent_loss_fn.anneal,
-        #         on_step=True,
-        #         on_epoch=False,
-        #         prog_bar=False,
-        #     )
-
-        return adv_loss
+            z = z_params[0]
+        return self.latent_loss_fn(z, z_params)
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
-        """Update discriminator and λ schedule if applicable."""
         if isinstance(self.latent_loss_fn, UpdatableLoss):
             self.latent_loss_fn.update_parameters(self.global_step)
 
     def train(self, mode=True):
-        """Override to handle discriminator training mode."""
         result = super().train(mode)
         if hasattr(self.latent_loss_fn, 'train'):
             self.latent_loss_fn.train(mode)
         return result
 
     def eval(self):
-        """Override to handle discriminator eval mode."""
         result = super().eval()
         if hasattr(self.latent_loss_fn, 'eval'):
             self.latent_loss_fn.eval()
@@ -259,10 +207,8 @@ class WassersteinMMDAE(VariationalAutoencoder):
         encoder_config: list,
         decoder_config: list,
         training: TrainingInit,
-        # Latent space parameters
         latent_size: int = 10,
         use_discrete: bool = True,
-        # Wasserstein MMD loss parameters
         lambda1: float = 10.0,
         lambda2: float = 1.0,
         prior_type: Literal["norm", "unif"] = "norm",
@@ -271,8 +217,6 @@ class WassersteinMMDAE(VariationalAutoencoder):
         lambda_schedule: tuple[int, float] | None = None,
     ):
         super().__init__(input_size, encoder_config, decoder_config, training, latent_size, "mse")
-
-        # Wasserstein MMD loss
         self.use_discrete = use_discrete
         self.latent_loss_fn = WassersteinMMD(
             lambda1=lambda1,
@@ -289,86 +233,9 @@ class WassersteinMMDAE(VariationalAutoencoder):
         z_params: tuple[torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
         if self.use_discrete:
-            z = z_params[0]  # discrete latents just use a mean-field approximation
-        mmd_loss = self.latent_loss_fn(z, z_params)
-
-        # Log additional metrics
-        # self.log(
-        #     "mmd_term", mmd_loss, on_step=True, on_epoch=True, prog_bar=False, sync_dist=True
-        # )
-        # self.log(
-        #     "lambda1", self.latent_loss_fn.lambda1, on_step=True, on_epoch=False, prog_bar=False
-        # )
-        # self.log(
-        #     "lambda2", self.latent_loss_fn.lambda2, on_step=True, on_epoch=False, prog_bar=False
-        # )
-        # if hasattr(self.latent_loss_fn, 'anneal'):
-        #     self.log(
-        #         "anneal",
-        #         self.latent_loss_fn.anneal,
-        #         on_step=True,
-        #         on_epoch=False,
-        #         prog_bar=False,
-        #     )
-
-        return mmd_loss
+            z = z_params[0]
+        return self.latent_loss_fn(z, z_params)
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
-        """Update λ schedule if applicable."""
         if isinstance(self.latent_loss_fn, UpdatableLoss):
             self.latent_loss_fn.update_parameters(self.global_step)
-
-
-class DiscreteAutoencoder(BaseModel):
-    def __init__(
-        self,
-        input_size: tuple[int, int, int],
-        training: TrainingInit,
-        # Encoder-decoder
-        encoder_config: list,
-        decoder_config: list,
-        # latent
-        resolution: tuple[int, int] = (16, 16),
-        vocab_size: int = 256,
-        embedding_dim: int = 64,
-        tau: float = 1.0,
-        tau_start: float | None = None,
-        tau_steps: float | None = None,
-    ):
-        super().__init__(training)
-        self.save_hyperparameters()
-
-        H, W = self.resolution = resolution
-
-        # Build patch encoder from config
-        self.patch_encoder = create_sequential(input_size, encoder_config)
-
-        # Get patch encoder output size for latent layer input
-        with torch.no_grad():
-            dummy_input = torch.zeros(1, *input_size)
-            patch_output = self.patch_encoder(dummy_input)
-            assert patch_output.shape[1:-1] == (H, W)
-            patch_output_size = patch_output.shape[-1]
-
-        # Build GumbelSoftmax latent layer
-        self.latent = GumbelSoftmax(
-            input_size=patch_output_size,
-            n_cat=vocab_size,
-            tau=tau,
-            tau_start=tau_start,
-            tau_steps=tau_steps
-        )
-        self.feature_dict = nn.Parameter(torch.empty(vocab_size, embedding_dim))
-        self.feature_dict.data.uniform_(-0.1, 0.1)
-
-        # Build patch decoder from config
-        decoder_input_size = embedding_dim, H, W
-        self.patch_decoder = create_sequential(decoder_input_size, decoder_config)
-
-    def forward(self, inputs):
-        h = self.patch_encoder(inputs).permute(0, 2, 3, 1)
-        B, H, W, _ = h.shape
-        z, _ = self.latent(h)
-        features = z.flatten(2) @ self.feature_dict
-        recons = self.patch_decoder(features.unflatten(0, (B, H, W)).permute(0, 3, 1, 2))
-        return recons, z

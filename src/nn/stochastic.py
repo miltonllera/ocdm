@@ -119,7 +119,8 @@ class GumbelSoftmax(nn.Module):
             self.step += 1
             self.tau = self.tau_schedule(self.step)
 
-        logits = F.log_softmax(self.logits(inputs), dim=-1)
+        # logits = F.log_softmax(self.logits(inputs), dim=-1)
+        logits = self.logits(inputs)
         z = F.gumbel_softmax(logits, self.tau, hard, dim=-1)
 
         return z, logits

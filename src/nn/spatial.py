@@ -15,6 +15,35 @@ def origin_pos_embedding(resolution, min_val=-1.0, max_val=1.0):
     return grid.to(dtype=torch.float32)
 
 
+def sine_pos_embedding(resolution, n_channels, temperature=10000):
+    H, W = resolution
+    # Standard 2D sinusoidal position embedding (e.g. DETR)
+    num_pos_feats = n_channels // 2
+
+    y_embed = torch.arange(1, H + 1, dtype=torch.float32)
+    x_embed = torch.arange(1, W + 1, dtype=torch.float32)
+
+    dim_t = torch.arange(num_pos_feats // 2, dtype=torch.float32)
+    dim_t = temperature ** (2 * dim_t / num_pos_feats)
+
+    pos_y = y_embed[:, None] / dim_t
+    pos_x = x_embed[:, None] / dim_t
+
+    pos_y = torch.stack([pos_y.sin(), pos_y.cos()], dim=2).flatten(1)
+    pos_x = torch.stack([pos_x.sin(), pos_x.cos()], dim=2).flatten(1)
+
+    pos_y = pos_y.unsqueeze(1).repeat(1, W, 1)
+    pos_x = pos_x.unsqueeze(0).repeat(H, 1, 1)
+
+    grid = torch.cat([pos_y, pos_x], dim=-1)
+
+    if grid.shape[-1] < n_channels:
+        padding = torch.zeros(H, W, n_channels - grid.shape[-1])
+        grid = torch.cat([grid, padding], dim=-1)
+
+    return grid
+
+
 class PositionConcat(nn.Module):
     def __init__(self, height, width=None, dim=-3, embed='origin'):
         super().__init__()
@@ -41,16 +70,13 @@ class PositionConcat(nn.Module):
         return torch.cat([inputs, grid], dim=self.dim).contiguous()
 
     def __repr__(self):
-        return 'PositionConcat(height={},width={})'.format(self.height,
-                                                           self.width)
+        return 'PositionConcat(height={},width={})'.format(self.height, self.width)
 
 
 class PositionEmbedding1D(nn.Module):
-    def __init__(self, max_len, d_model):
+    def __init__(self, d_model, max_len):
         super().__init__()
-        self.pe = nn.Parameter(torch.zeros(1, max_len, d_model),
-                               requires_grad=True)
-
+        self.pe = nn.Parameter(torch.zeros(max_len, d_model), requires_grad=True)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -58,7 +84,7 @@ class PositionEmbedding1D(nn.Module):
 
     def forward(self, input, start_pos=0):
         T = input.shape[1]
-        return input + self.pe[:, start_pos:start_pos + T]
+        return input + self.pe[start_pos:start_pos + T]
 
 
 class PositionEmbedding2D(nn.Module):
@@ -74,16 +100,24 @@ class PositionEmbedding2D(nn.Module):
         if embed == 'cardinal':
             grid = cardinal_pos_embedding((height, width))
             linear = nn.Linear(4, n_channels)
+            linear_init(linear, activation=None)
+            self.grid = grid.transpose(2, 0)
+            self.projection = linear
         elif embed == 'origin':
             grid = origin_pos_embedding((height, width))
             linear = nn.Linear(2, n_channels)
+            linear_init(linear, activation=None)
+            self.grid = grid.transpose(2, 0)
+            self.projection = linear
+        elif embed == 'sine':
+            grid = sine_pos_embedding((height, width), n_channels)
+            self.grid = grid
+            self.projection = nn.Identity()
         else:
             raise ValueError('Unrecognized embedding type {}'.format(embed))
 
-        linear_init(linear, activation=None)
-
-        self.grid = grid.transpose(2, 0)
-        self.projection = linear
+    def get_projection(self, device):
+        return self.projection(self.grid.to(device=device))
 
     def forward(self, inputs: torch.Tensor, pos=None) -> torch.Tensor:
         proj = self.projection(self.grid.to(device=inputs.device))
@@ -92,7 +126,8 @@ class PositionEmbedding2D(nn.Module):
         return inputs + proj
 
     def reset_parameters(self):
-        linear_init(self.projection, activation=None)
+        if isinstance(self.projection, nn.Linear):
+            linear_init(self.projection, activation=None)
 
     def __repr__(self):
         return 'PositionEmbedding2D(height={}, width={})'.format(

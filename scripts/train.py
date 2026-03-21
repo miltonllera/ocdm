@@ -17,6 +17,9 @@ from torchvision.utils import make_grid
 from src.dataset.datamodule import CompositionTaskDataModule, DisentangledDataModule
 from src.training.optim import TrainingInit
 
+import torch
+torch.autograd.set_detect_anomaly(True)
+
 
 rootutils.setup_root(".", cwd=True)
 
@@ -41,12 +44,16 @@ def main(cfg: DictConfig) -> dict[str, float]:
     dataset_cfg: dict[str, Any] = OmegaConf.to_container(cfg.dataset, resolve=True)  # type: ignore
 
     datataset_cls = hydra.utils.get_class(dataset_cfg.pop('_target_'))  # type: ignore
-    if (prediction_type := dataset_cfg.pop('prediction_type', "unsupervised")) != "composition":
+    prediction_type = dataset_cfg.pop('prediction_type', "unsupervised")
+    if prediction_type == "composition":
+        datamodule = CompositionTaskDataModule(datataset_cls, seed=seed, **dataset_cfg)
+    elif prediction_type == "multi_shape":
+        from src.dataset.datamodule import ColoredMultiShapeDataModule
+        datamodule = ColoredMultiShapeDataModule(datataset_cls, seed=seed, **dataset_cfg)
+    else:
         datamodule = DisentangledDataModule(
             datataset_cls, prediction_type=prediction_type, seed=seed, **dataset_cfg,
         )
-    else:
-        datamodule = CompositionTaskDataModule(datataset_cls, seed=seed, **dataset_cfg)
 
     # Create TrainingInit from config
     optimizer_init = instantiate(cfg.training.optimizer, _partial_=True)
@@ -91,7 +98,10 @@ def main(cfg: DictConfig) -> dict[str, float]:
 
     # Train
     _logger.info("Starting training phase...")
-    trainer.fit(model, datamodule=datamodule)
+    try:
+        trainer.fit(model, datamodule=datamodule, ckpt_path=cfg.get('ckpt_path', None))
+    except KeyboardInterrupt:
+        pass
 
     _logger.info("Training finished.")
     train_metrics = {k: float(v) for k, v in trainer.callback_metrics.items() if 'train' in k}

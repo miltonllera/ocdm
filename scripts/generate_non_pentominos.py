@@ -14,6 +14,7 @@ def main(args):
     # Override color settings if using Shapes3D colors
 
     SpriteGenerator(
+        args.shapes,
         args.height,
         args.width,
         args.pad,
@@ -23,6 +24,7 @@ def main(args):
         args.lim_scales,
         args.num_scales,
         args.num_colors,
+        args.num_bg_colors,
         args.lim_xs,
         args.num_xs,
         args.lim_ys,
@@ -96,6 +98,8 @@ class SpriteLoader(SpriteDict):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("sprite generatror")
 
+    parser.add_argument("--shapes", type=int, default=None, nargs="+",
+        help="Indices of shapes to include (0-11). By default, all shapes are used.")
     parser.add_argument("--height", type=int, default=60,
         help="Height of the image")
     parser.add_argument("--width", type=int, default=None,
@@ -116,6 +120,8 @@ if __name__ == "__main__":
         help="Number of scale values to sample")
     parser.add_argument("--num_colors", type=int, default=1,
         help="Number of color values to sample")
+    parser.add_argument("--num_bg_colors", type=int, default=1,
+        help="Number of background color values to sample")
     parser.add_argument("--lim_xs", type=float, default=None, nargs=2,
         help="Hue range in HSV format")
     parser.add_argument("--num_xs", type=int, default=20,

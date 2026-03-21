@@ -16,7 +16,7 @@ dataset:
   # val_split: 0.2
 
 model:
-  _target_: src.model.grouping.FigureGroundDecoderControl
+  _target_: src.model.control.FigureGroundDecoderControl
   input_size: [1, 64, 64]
 
   encoder_config:
@@ -48,7 +48,7 @@ model:
   n_iter: 3
   slot_channels: 1
   slot_hidden_size: 128
-  approx_implicit_grad: true
+  approx_implicit_grad: false
 
 training:
   optimizer:

@@ -13,7 +13,7 @@ dataset:
   rebalance_dim: shape
 
 model:
-  _target_: src.model.grouping.FigureGroundAutoencoder
+  _target_: src.model.slot.FigureGroundAutoencoder
   input_size: [1, 64, 64]  # channels, height, width (assuming grayscale, will adapt based on data)
 
   # Encoder layers configuration
@@ -47,7 +47,7 @@ model:
   n_iter: 3
   slot_channels: 1
   slot_hidden_size: 128
-  approx_implicit_grad: true
+  approx_implicit_grad: false
 
 # Training configuration
 training:

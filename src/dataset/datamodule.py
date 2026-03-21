@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader, Subset, random_split
 from typing import Callable, Literal
 
 from .comptask import CompositionTask
+from .multi_shape import ColoredMultiShapeDataset
 from .utils import build_filter
 from .sampler import ImbalancedSampler
 
@@ -225,4 +226,105 @@ class CompositionTaskDataModule(pl.LightningDataModule):
             return ImbalancedSampler(labels)
 
         return None
+
+
+class ColoredMultiShapeDataModule(pl.LightningDataModule):
+    """
+    A PyTorch Lightning DataModule for training with the ColoredMultiShapeDataset.
+    """
+    def __init__(
+        self,
+        dataset: Callable[[str, str, Callable], Dataset],
+        n_shapes: int = 2,
+        num_colors: int = 10,
+        held_out_filter: Callable | str | None = None,
+        filter_fn: Callable | None = None,
+        batch_size: int = 64,
+        num_workers: int = 4,
+        seed: int | None = 42,
+        path: str | None = None,
+    ) -> None:
+        if isinstance(held_out_filter, str):
+            held_out_filter = build_filter(dataset, held_out_filter)
+        assert held_out_filter is None or callable(held_out_filter)
+
+        super().__init__()
+        self.dataset = dataset
+        self.n_shapes = n_shapes
+        self.num_colors = num_colors
+        self.held_out_filter = held_out_filter
+        self.filter_fn = filter_fn
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.seed = seed
+        self.dataset_path = path
+        self.train_dataset = None
+        self.val_dataset = None
+        self.test_dataset = None
+
+    def setup(self, stage: str | None = None):
+        if (
+            stage == 'fit' and self.train_dataset is not None or
+            stage == 'test' and self.test_dataset is not None
+        ):
+            return
+
+        base_train_dataset = self.dataset(self.dataset_path, "unsupervised", self.held_out_filter)
+
+        if stage == "fit":
+            self.train_dataset = ColoredMultiShapeDataset(
+                base_train_dataset,
+                n_shapes=self.n_shapes,
+                num_colors=self.num_colors,
+                filter_fn=self.filter_fn,
+                prediction_type='unsupervised',
+                seed=self.seed
+            )
+            self.val_dataset = ColoredMultiShapeDataset(
+                base_train_dataset,
+                n_shapes=self.n_shapes,
+                num_colors=self.num_colors,
+                filter_fn=self.filter_fn,
+                prediction_type='unsupervised',
+                seed=self.seed + 1 if self.seed is not None else None
+            )
+        else:
+            self.test_dataset = ColoredMultiShapeDataset(
+                base_train_dataset,
+                n_shapes=self.n_shapes,
+                num_colors=self.num_colors,
+                filter_fn=self.filter_fn,
+                prediction_type='unsupervised',
+                seed=self.seed + 2 if self.seed is not None else None
+            )
+
+    def train_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.train_dataset,  # type: ignore
+            self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=True,
+            pin_memory=True,
+        )
+
+    def val_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.val_dataset,  # type: ignore
+            self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+            pin_memory=True,
+        )
+
+    def test_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.test_dataset,  # type: ignore
+            self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+            pin_memory=True,
+        )
+
+    def predict_dataloader(self) -> DataLoader:
+        return self.test_dataloader()
 

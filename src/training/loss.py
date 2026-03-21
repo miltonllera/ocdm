@@ -1,10 +1,11 @@
 from abc import abstractmethod
-from typing import Any, Literal, Optional, Callable
+from typing import Any, Literal, Callable
 from functools import partial
 
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 # import torch.multiprocessing as mp
 from torch.nn.functional import (
     mse_loss,
@@ -329,3 +330,19 @@ class HungarianAssignmentLoss(Loss):
         batch_idx = torch.arange(B).unsqueeze_(-1)
 
         return pairwise_cost[batch_idx, idx_input, idx_targets].sum() / B
+
+
+class DiscriminatorLoss(nn.Module):
+    def __init__(self, loss_type: Literal['hinge', 'bce'] = 'hinge'):
+        super().__init__()
+        self.loss_type = loss_type
+
+    def forward(self, logits_input, logits_target):
+        if self.loss_type == 'hinge':
+            return 0.5 * (torch.mean(F.relu(1. - logits_target) + F.relu(1. + logits_input)))
+        elif self.loss_type == 'bce':
+            ones = logits_input.new_ones(logits_input.shape)
+            zeros = torch.zeros_like(ones)
+            return 0.5 * (logits_bce(logits_target, ones) + logits_bce(logits_input, zeros))
+        else:
+            raise RuntimeError("Unrecognized loss type")

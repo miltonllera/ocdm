@@ -19,7 +19,7 @@ dataset:
 
 # Model configuration
 model:
-  _target_: src.model.autoencoder.BetaVAE
+  _target_: src.model.vae.BetaVAE
   input_size: [1, 64, 64]  # channels, height, width
 
   # Encoder layers configuration
