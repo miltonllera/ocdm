@@ -4,14 +4,17 @@ export CUDA_VISIBLE_DEVICES=1
 
 DATASET_PATH="data/datasets/pentominos_dsprites-matched/"
 
-for i in {1..5}; do
-    uv run python -m scripts.train experiment=combgen/pentominos_rotation_sa \
-      dataset.path=$DATASET_PATH \
-      run_name='combgen_pentominos_rotation_sa_dsprites-match'
+for i in {1..1}; do
+    # uv run python -m scripts.train experiment=combgen/pentominos_rotation_sa \
+    #   condition_name='combgen_pentominos_rotation_dsprites-match' \
+    #   dataset.path=$DATASET_PATH \
+    #   # dataset.held_out_filter=' \( shape == 6 \) & \( angle >= 180 \) '
     uv run python -m scripts.train experiment=combgen/pentominos_rotation_wae \
       dataset.path=$DATASET_PATH \
-      run_name='combgen_pentominos_rotation_wae_dsprites-match'
-    uv run python -m scripts.train experiment=combgen/pentominos_rotation_vae \
-      dataset.path=$DATASET_PATH \
-      run_name='combgen_pentominos_rotation_vae-match'
+      condition_name='combgen_pentominos_rotation_dsprites-match' \
+      # dataset.held_out_filter="( shape == 6 ) & ( angle >= 180 )"
+    # uv run python -m scripts.train experiment=combgen/pentominos_rotation_vae \
+    #   dataset.path=$DATASET_PATH \
+    #   condition_name='combgen_pentominos_rotation_dsprites-match'
+    #   dataset.held_out_filter: "( shape == 6 ) & ( angle >= 180 )"
 done
