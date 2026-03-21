@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=1
 
 #------------------------------- Replication from LiLS -----------------------------------
 
@@ -23,7 +23,7 @@ export CUDA_VISIBLE_DEVICES=2
 # done
 
 
-# for i in {1..5}; do
+# for i in {1..1}; do
 #   uv run python -m scripts.train experiment=combgen/shapes3d_shape_hue_vae model.latent_size=8
 #   uv run python -m scripts.train experiment=combgen/shapes3d_shape_hue_wae model.latent_size=8
 #   uv run python -m scripts.train experiment=combgen/shapes3d_shape_hue_sa model.slot_size=8
@@ -73,12 +73,12 @@ for i in {1..1}; do
   # uv run python -m scripts.train experiment=combgen/pentominos_rotation_sa model.slot_size=16
 #
 #   uv run python -m scripts.train experiment=combgen/pentominos_rotation_vae model.latent_size=32
-  uv run python -m scripts.train experiment=combgen/pentominos_rotation_wae model.latent_size=32
+  # uv run python -m scripts.train experiment=combgen/pentominos_rotation_wae model.latent_size=32
   # uv run python -m scripts.train experiment=combgen/pentominos_rotation_sa model.slot_size=32
 
-#   uv run python -m scripts.train experiment=combgen/pentominos_rotation_vae model.latent_size=64
+  # uv run python -m scripts.train experiment=combgen/pentominos_rotation_vae model.latent_size=64
   # uv run python -m scripts.train experiment=combgen/pentominos_rotation_wae model.latent_size=64
-  # uv run python -m scripts.train experiment=combgen/pentominos_rotation_sa model.slot_size=64
+  uv run python -m scripts.train experiment=combgen/pentominos_rotation_sa model.slot_size=64
 done
 
 

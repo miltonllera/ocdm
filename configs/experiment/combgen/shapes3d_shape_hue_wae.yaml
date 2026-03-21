@@ -51,9 +51,9 @@ model:
   # WAE parameters
   latent_size: 10
   lambda1: 10.0
-  lambda2: 1.0
+  lambda2: 0.001
   prior_type: norm
-  prior_var: 1.0
+  prior_var: 2.0
 
 # Training configuration
 training:
@@ -73,7 +73,7 @@ training:
 # Trainer configuration
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_steps: 100_000
+  max_steps: 300_000
   gradient_clip_val: 1.0
   accelerator: auto
   devices: auto
