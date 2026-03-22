@@ -330,7 +330,7 @@ class DiscreteAutoencoder(BaseModel):
         # latent
         resolution: tuple[int, int] = (16, 16),
         vocab_size: int = 256,
-        embedding_dim: int = 64,
+        token_dim: int = 64,
         tau: float = 1.0,
         tau_start: float | None = None,
         tau_steps: float | None = None,
@@ -338,17 +338,16 @@ class DiscreteAutoencoder(BaseModel):
         super().__init__(training)
         self.save_hyperparameters()
 
-        H, W = self.resolution = resolution
-
         # Build patch encoder from config
+        H, W = resolution
         self.patch_encoder = create_sequential(input_size, encoder_config)
 
         # Get patch encoder output size for latent layer input
         with torch.no_grad():
             dummy_input = torch.zeros(1, *input_size)
             patch_output = self.patch_encoder(dummy_input)
-            assert patch_output.shape[1:-1] == (H, W)
-            patch_output_size = patch_output.shape[-1]
+            assert patch_output.shape[-2:] == (H, W)
+            patch_output_size = patch_output.shape[-3]
 
         # Build GumbelSoftmax latent layer
         self.latent = GumbelSoftmax(
@@ -358,17 +357,58 @@ class DiscreteAutoencoder(BaseModel):
             tau_start=tau_start,
             tau_steps=tau_steps
         )
-        self.feature_dict = nn.Parameter(torch.empty(vocab_size, embedding_dim))
-        self.feature_dict.data.uniform_(-0.1, 0.1)
-
+        self.feature_dict = nn.Parameter(torch.empty(vocab_size, token_dim))
         # Build patch decoder from config
-        decoder_input_size = embedding_dim, H, W
+        decoder_input_size = token_dim, H, W
         self.patch_decoder = create_sequential(decoder_input_size, decoder_config)
+
+        self.recons_loss = ReconstructionLoss()
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        self.feature_dict.data.uniform_(-0.1, 0.1)
+        weights_init(self.patch_encoder)
+        weights_init(self.patch_decoder)
 
     def forward(self, inputs):
         h = self.patch_encoder(inputs).permute(0, 2, 3, 1)
         B, H, W, _ = h.shape
-        z, _ = self.latent(h)
-        features = z.flatten(2) @ self.feature_dict
+        z, logits = self.latent(h)
+        features = z.flatten(0, 2) @ self.feature_dict
         recons = self.patch_decoder(features.unflatten(0, (B, H, W)).permute(0, 3, 1, 2))
-        return recons, z
+        return recons, z, logits
+
+    def embed(self, inputs):
+        return self.latent(self.patch_encoder(inputs))[0]
+
+    def decode(self, z):
+        B, _, H, W = z.shape
+        features = z.flatten(2) @ self.feature_dict
+        return self.patch_decoder(features.unflatten(0, (B, H, W)).permute(0, 3, 1, 2))
+
+    def _step(
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+        phase: Literal["train", "val", "test"]
+    ) -> torch.Tensor:
+        inputs, targets = batch
+        recons, _, _ = self.forward(inputs)
+        loss = self.recons_loss(recons, targets)
+
+        is_train = phase == "train"
+        self.log_dict(
+            {
+                f"{phase}/loss": loss,
+            },
+            on_epoch=not is_train,
+            on_step=is_train,
+            prog_bar=is_train,
+            sync_dist=True,
+            rank_zero_only=True
+        )
+
+        return loss
+
+    def reconstruction(self, inputs: torch.Tensor):
+        return self.forward(inputs)[0]
