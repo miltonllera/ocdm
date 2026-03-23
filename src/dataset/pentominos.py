@@ -17,6 +17,7 @@ from itertools import product
 from typing import Callable, Optional
 
 import numpy as np
+import pandas as pd
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms as trans
@@ -152,6 +153,72 @@ class FixedRotationPentominos(Pentominos):
         rotated_image = self.load_image(self.target_image_files[idx])
 
         return image, rotated_image
+
+
+class Pentominos3D(Dataset):
+    n_factors = 6
+    factors = ('object', 'rotation_y', 'color_hue', 'wall_color_hue', 'floor_color_hue', 'camera_angle')
+
+    def __init__(
+        self,
+        path: str,
+        prediction_type: str = 'unsupervised',
+        held_out_filter: Callable | None = None,
+    ) -> None:
+        meta_path = osp.join(path, 'metadata.csv')
+        df = pd.read_csv(meta_path)
+        df.columns = df.columns.str.strip()
+
+        shape_names = sorted(df['object'].unique())
+        shape_to_idx = {s: i for i, s in enumerate(shape_names)}
+
+        image_files = [osp.join(path, fn) for fn in df['filename']]
+        factor_cols = ['object', 'rotation_y', 'color_hue', 'Wall_color_hue', 'Floor_color_hue', 'camera_angle']
+        raw_values = df[factor_cols].copy()
+        raw_values['object'] = raw_values['object'].map(shape_to_idx)
+        factor_values = raw_values.to_numpy(dtype=np.float32)
+
+        unique_per_factor = [np.sort(np.unique(factor_values[:, i])) for i in range(self.n_factors)]
+        factor_classes = np.stack(
+            [np.searchsorted(unique_per_factor[i], factor_values[:, i]) for i in range(self.n_factors)],
+            axis=1,
+        ).astype(np.float32)
+
+        Pentominos3D.img_size = (3, 64, 64)
+        Pentominos3D.factor_sizes = tuple(len(u) for u in unique_per_factor)
+        Pentominos3D.shape_names = np.asarray(shape_names)
+        Pentominos3D.unique_values = {f: unique_per_factor[i].tolist() for i, f in enumerate(self.factors)}
+
+        if held_out_filter is not None:
+            idx = held_out_filter(factor_values)
+            image_files = [image_files[i] for i in idx.nonzero()[0]]
+            factor_values = factor_values[idx]
+            factor_classes = factor_classes[idx]
+            if len(image_files) == 0:
+                raise ValueError("Condition filter removed all data")
+
+        self.image_files = image_files
+        self.factor_values = factor_values
+        self.factor_classes = factor_classes
+        self.transform = trans.Compose([trans.Resize((64, 64)), trans.ToTensor()])
+        self.prediction_type = prediction_type
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, index):
+        image = self.load_image(self.image_files[index])
+        if self.prediction_type == 'unsupervised':
+            return image, image
+        elif self.prediction_type == 'classification':
+            return image, self.factor_classes[index].astype(np.int64)
+        return image, self.factor_values[index]
+
+    def load_image(self, path):
+        return self.transform(Image.open(path).convert('RGB'))
+
+    def map_shapes(self, values):
+        return type(self).shape_names[values.astype(int)]
 
 
 def shape_prediction(targets: np.ndarray) -> np.ndarray:
