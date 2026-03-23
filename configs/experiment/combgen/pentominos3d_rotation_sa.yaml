@@ -1,57 +1,50 @@
 # @package _global_
 
 # Basic settings
-condition_name: combgen_colored_pentominos_rotation
+condition_name: combgen_pentominos3d_rotation
 model_name: sa
 test: true
 
 # Dataset configuration
 dataset:
-  _target_: src.dataset.pentominos.Pentominos
-  path: data/datasets/pentominos_colored/
+  _target_: src.dataset.pentominos.Pentominos3D
+  path: data/datasets/pentominos_3d/
   prediction_type: unsupervised
-  held_out_filter: "np.isin( shape , [1, 3, 5, 8] ) & ( angle >= 180 )"
-  rebalance_dim: shape
-  batch_size: 128
-  val_split: 0.1
-
-  # Performance stuff
-  # num_worker: 4
+  held_out_filter: "np.isin( object , [1, 3, 6, 8] ) & ( rotation_y >= 3.14 )"
 
 # Model configuration
 model:
   _target_: src.model.grouping.SlotAutoencoder
-  input_size: [3, 64, 64]  # channels, height, width (RGB)
+  input_size: [3, 128, 128]  # channels, height, width (RGB)
 
   # Encoder layers configuration
   encoder_config:
-    - [conv, [32, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
-    - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
-    - [permute, [0, 2, 3, 1]]  # Change to channel-last for position embedding
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [permute, [0, 2, 3, 1]]
     - [posemb2d, {embed: cardinal}]
     - [flatten, [1, 2]]
     - [layer_norm, [-1]]
-    - [linear, [32]]
+    - [linear, [64]]
     - [relu]
-    - [linear, [32]]
 
   # Decoder layers configuration
   decoder_config:
-    - [spatbroad, [8, 8], {input_last: True}]  # Spatial broadcast to 8x8
+    - [spatbroad, [16, 16], {input_last: True}]
     - [posemb2d, {embed: cardinal}]
     - [permute, [0, 3, 1, 2]]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
-    - [tconv, [4, 4, 2, 1]]
+    - [tconv, [4, 4, 2, 1]]    # 3 RGB channels + mask
 
   # Slot Attention parameters
-  n_slots: 2
+  n_slots: 6
   slot_size: 16
   n_iter: 3
   slot_channels: 1
@@ -65,23 +58,23 @@ training:
     lr: 0.0003
 
   schedulers:
-    # exponential:
-    #   _target_: src.training.scheduler.ExponentialLR
-    #   _partial_: true
-    #   gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
-    #   decay_groups: null
+    exponential:
+      _target_: src.training.scheduler.ExponentialLR
+      _partial_: true
+      gamma: 0.99999653  # 0.5 ** (1 / 200000)
+      decay_groups: null
     warmup:
       _target_: src.training.scheduler.WarmupLR
       _partial_: true
       start_value: 0.0
-      warmup_steps: 3000
+      warmup_steps: 20_000
 
   scheduling_metric: val/loss
 
 # Trainer configuration
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_steps: 1_000_000
+  max_steps: 500_000
   gradient_clip_val: 1.0
   accelerator: auto
   devices: auto
@@ -90,4 +83,3 @@ trainer:
   check_val_every_n_epoch: null
   fast_dev_run: false
   default_root_dir: ${paths.log_dir}/figure2/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
-

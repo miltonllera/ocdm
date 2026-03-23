@@ -30,7 +30,7 @@ model:
 
   # Transformer Decoder
   n_head: 4
-  num_layers: 2
+  num_layers: 4
   ffwd_dim: 192
   dropout: 0.1
   use_memory_mask: false
@@ -38,11 +38,11 @@ model:
 
   # Slot Attention
   n_slots: 3
-  slot_size: 32
+  slot_size: 64
   slot_n_iter: 3
   slot_channels: 1
-  slot_hidden_size: 192
-  slot_approx_implicit_grad: true
+  slot_hidden_size: 128
+  slot_approx_implicit_grad: false
 
   # Encoder layers configuration
   patch_encoder_config:
@@ -52,9 +52,9 @@ model:
     - [relu]
 
     # A three layer MLP to process each patch
-    # - [conv, [64, 1, 1, 0], {bias: false}]
-    # - [group_norm, [1]]
-    # - [relu]
+    - [conv, [64, 1, 1, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
 
     - [conv, [64, 1, 1, 0], {bias: false}]
     - [group_norm, [1]]
@@ -74,13 +74,13 @@ model:
     - [group_norm, [1]]
     - [relu]
 
-    # - [conv, [64, 3, 1, 1], {bias: False}]
-    # - [group_norm, [1]]
-    # - [relu]
+    - [conv, [64, 3, 1, 1], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
 
-    # - [conv, [64, 1, 1, 0], {bias: False}]
-    # - [group_norm, [1]]
-    # - [relu]
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
 
     # Pixel shuffle for upsampling
     - [pixel_shuffle, [2], {bias: False}]
@@ -89,13 +89,13 @@ model:
     - [group_norm, [1]]
     - [relu]
 
-    # - [conv, [64, 3, 1, 1], {bias: False}]
-    # - [group_norm, [1]]
-    # - [relu]
+    - [conv, [64, 3, 1, 1], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
 
-    # - [conv, [64, 1, 1, 0], {bias: False}]
-    # - [group_norm, [1]]
-    # - [relu]
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
 
     - [pixel_shuffle, [2], {bias: False}]
 

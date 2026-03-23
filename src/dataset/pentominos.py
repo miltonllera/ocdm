@@ -157,7 +157,9 @@ class FixedRotationPentominos(Pentominos):
 
 class Pentominos3D(Dataset):
     n_factors = 6
-    factors = ('object', 'rotation_y', 'color_hue', 'wall_color_hue', 'floor_color_hue', 'camera_angle')
+    factors = (
+        'object', 'rotation_y', 'color_hue', 'wall_color_hue', 'floor_color_hue', 'camera_angle'
+    )
 
     def __init__(
         self,
@@ -173,7 +175,9 @@ class Pentominos3D(Dataset):
         shape_to_idx = {s: i for i, s in enumerate(shape_names)}
 
         image_files = [osp.join(path, fn) for fn in df['filename']]
-        factor_cols = ['object', 'rotation_y', 'color_hue', 'Wall_color_hue', 'Floor_color_hue', 'camera_angle']
+        factor_cols = [
+            'object', 'rotation_y', 'color_hue', 'Wall_color_hue', 'Floor_color_hue', 'camera_angle'
+        ]
         raw_values = df[factor_cols].copy()
         raw_values['object'] = raw_values['object'].map(shape_to_idx)
         factor_values = raw_values.to_numpy(dtype=np.float32)
@@ -184,7 +188,7 @@ class Pentominos3D(Dataset):
             axis=1,
         ).astype(np.float32)
 
-        Pentominos3D.img_size = (3, 64, 64)
+        Pentominos3D.img_size = (3, 128, 128)
         Pentominos3D.factor_sizes = tuple(len(u) for u in unique_per_factor)
         Pentominos3D.shape_names = np.asarray(shape_names)
         Pentominos3D.unique_values = {f: unique_per_factor[i].tolist() for i, f in enumerate(self.factors)}
@@ -200,7 +204,7 @@ class Pentominos3D(Dataset):
         self.image_files = image_files
         self.factor_values = factor_values
         self.factor_classes = factor_classes
-        self.transform = trans.Compose([trans.Resize((64, 64)), trans.ToTensor()])
+        self.transform = trans.Compose([trans.Resize((128, 128)), trans.ToTensor()])
         self.prediction_type = prediction_type
 
     def __len__(self):

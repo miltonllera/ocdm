@@ -14,12 +14,12 @@ dataset:
 
 # Model configuration
 model:
-  _target_: src.model.grouping.FigureGroundAutoencoder
+  _target_: src.model.grouping.SlotAutoencoder
   input_size: [3, 64, 64]  # channels, height, width (RGB)
 
   # Encoder layers configuration
   encoder_config:
-    - [conv, [32, 4, 2, 1]]
+    - [conv, [64, 4, 2, 1]]
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
@@ -44,6 +44,7 @@ model:
     - [tconv, [4, 4, 2, 1]]    # 3 RGB channels + mask
 
   # Slot Attention parameters
+  n_slots: 4
   slot_size: 16
   n_iter: 3
   slot_channels: 1
@@ -60,7 +61,8 @@ training:
     exponential:
       _target_: src.training.scheduler.ExponentialLR
       _partial_: true
-      gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
+      # gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
+      gamma: 0.99999653  # 0.5 ** (1 / 200000)
       decay_groups: null
     warmup:
       _target_: src.training.scheduler.WarmupLR
