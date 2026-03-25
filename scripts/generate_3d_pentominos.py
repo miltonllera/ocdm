@@ -11,8 +11,8 @@ import csv
 OUTPUT_DIR = "data/temp/pentominos_3d"
 CAMERA = "Camera"
 
-NUM_COLORS = 6
-NUM_ANGLES = 8              # object rotation around Y axis
+NUM_COLORS = 8
+NUM_ANGLES = 24              # object rotation around Y axis
 ROT_MIN = 0.0
 ROT_MAX = 2 * math.pi
 
@@ -158,6 +158,8 @@ def main():
                 ])
 
                 counter += 1
+
+            csv_file.flush()
 
             reset_object(obj, original_states[obj.name])
 
