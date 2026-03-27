@@ -6,6 +6,7 @@ import torch.nn as nn
 
 from src.nn.init import weights_init
 from src.nn.stochastic import DiagonalGaussian, GumbelSoftmax
+from src.nn.embedding import Quantization
 from src.nn.utils.parsing import create_sequential
 from src.training.loss import (
     ReconstructionLoss,
@@ -412,3 +413,135 @@ class DiscreteAutoencoder(BaseModel):
 
     def reconstruction(self, inputs: torch.Tensor):
         return self.forward(inputs)[0]
+
+
+class VectorQuantizedAutoencoder(BaseModel):
+    def __init__(
+        self,
+        input_size: tuple[int, int, int],
+        training: TrainingInit,
+        # Encoder-decoder
+        encoder_config: list,
+        decoder_config: list,
+        # latent
+        resolution: tuple[int, int] = (16, 16),
+        vocab_size: int = 256,
+        token_dim: int = 64,
+        beta: float = 0.25,
+    ):
+        super().__init__(training)
+        self.save_hyperparameters()
+
+        # Build patch encoder from config
+        H, W = resolution
+        self.resolution = H, W
+        self.patch_encoder = create_sequential(input_size, encoder_config)
+
+        # Get patch encoder output size for latent layer input
+        with torch.no_grad():
+            dummy_input = torch.zeros(1, *input_size)
+            patch_output = self.patch_encoder(dummy_input)
+            assert patch_output.shape[-2:] == (H, W)
+            patch_output_size = patch_output.shape[-3]
+
+        # Build GumbelSoftmax latent layer
+        self.latent_proj = nn.Linear(patch_output_size, token_dim)
+        self.feature_codebook = Quantization(vocab_size, token_dim, beta)
+        # Build patch decoder from config
+        decoder_input_size = token_dim, H, W
+        self.patch_decoder = create_sequential(decoder_input_size, decoder_config)
+
+        self.recons_loss = ReconstructionLoss()
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        self.feature_codebook.reset_parameters()
+        weights_init(self.patch_encoder)
+        weights_init(self.patch_decoder)
+
+    def forward(self, inputs):
+        h = self.patch_encoder(inputs)
+        B, _, H, W = h.shape
+
+        z =  self.latent_proj(h.permute(0, 2, 3, 1).flatten(0, 2))
+        z_q, idx, dist = self.feature_codebook(z)
+        z_q = z_q.unflatten(0, (B, H, W)).permute(0, 3, 1, 2)
+        idx = idx.unflatten(0, (B, H, W))
+        dist = dist.unflatten(0, (B, H, W))
+
+        recons = self.patch_decoder(z_q)
+        return recons, idx, dist
+
+    def embed(self, inputs):
+        return self.feature_codebook(self(inputs)[1])
+
+    def decode(self, idx):
+        B, S = idx.shape
+        assert S == self.resolution[0] * self.resolution[1]
+        z_q = self.feature_codebook(idx)
+        return self.patch_decoder(z_q.unflatten(1, (self.resolution)).permute(0, 3, 1, 2))
+
+    def reconstruction(self, inputs: torch.Tensor):
+        return self.forward(inputs)[0]
+
+    def _step(
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        inputs, targets = batch
+        recons, z_q, dist = self.forward(inputs)
+        recons_loss = self.recons_loss(recons, targets)
+        codebook_loss = dist.sum() / len(inputs)
+        return recons_loss, codebook_loss, z_q
+
+    def training_step(
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+    ) -> torch.Tensor:
+        inputs, targets = batch
+        recons_loss, codebook_loss, _ = self._step(batch, batch_idx)
+        loss = recons_loss + codebook_loss
+
+        self.log_dict(
+            {
+                f"train/loss": loss,
+                f"train/recons_loss": recons_loss,
+                f"train/codebook_loss": codebook_loss,
+            },
+            on_epoch=False,
+            on_step=True,
+            prog_bar=True,
+            sync_dist=True,
+            rank_zero_only=True
+        )
+
+        return loss
+
+    def validation_step(
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+        phase: Literal["val", "test"] = "val",
+    ) -> torch.Tensor:
+        recons_loss, codebook_loss, _ = self._step(batch, batch_idx)
+        self.log_dict(
+            {
+                f"{phase}/loss": recons_loss,
+                f"{phase}/codebook_loss": codebook_loss,
+            },
+            on_epoch=True,
+            on_step=False,
+            prog_bar=False,
+            sync_dist=True,
+            rank_zero_only=True
+        )
+        return recons_loss
+
+    def test_step(
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+    ) -> torch.Tensor:
+        return self.validation_step(batch, batch_idx, "test")
