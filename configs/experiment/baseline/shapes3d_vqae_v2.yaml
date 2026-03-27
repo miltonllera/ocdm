@@ -17,6 +17,7 @@ model:
   resolution: [16, 16]
   vocab_size: 256
   token_dim: 64
+  beta: 0.5
 
   # Encoder layers configuration
   encoder_config:

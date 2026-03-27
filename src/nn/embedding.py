@@ -6,7 +6,7 @@ dist_fn = lambda x, y: torch.sum((x - y) ** 2, dim=-1)
 
 
 class Quantization(nn.Module):
-    def __init__(self, vocab_size, embedding_dim, beta=0.25):
+    def __init__(self, vocab_size, embedding_dim, beta=1.0):
         super().__init__()
         self.beta = beta
         self.codebook = nn.Embedding(vocab_size, embedding_dim)

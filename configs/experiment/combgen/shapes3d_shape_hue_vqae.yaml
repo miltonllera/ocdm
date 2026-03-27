@@ -1,14 +1,14 @@
 # @package _global_
 
 # Basic settings
-condition_name: baseline_shapes3d
+condition_name: combgen_shapes3d_shape_hue
 model_name: vqae
 test: true
 
 dataset:
   _target_: src.dataset.shapes3d.Shapes3D
   path: data/datasets/shapes3d/3dshapes.h5
-  held_out_filter: null
+  held_out_filter: "( shape == 3 ) & ( object_hue > 0.5 )"  # NOTE: parenthesis are important
 
 model:
   _target_: src.model.autoencoder.VectorQuantizedAutoencoder
@@ -41,11 +41,11 @@ model:
 
   decoder_config:
     # Three layer stack of convolutions which share information in the middle layer
-    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [conv, [64, 3, 1, 1], {bias: False}]
     - [group_norm, [1]]
     - [relu]
 
-    - [conv, [64, 3, 1, 1], {bias: False}]
+    - [conv, [64, 1, 1, 0], {bias: False}]
     - [group_norm, [1]]
     - [relu]
 
