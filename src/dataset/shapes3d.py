@@ -81,10 +81,11 @@ class Shapes3D(Dataset):
         self.batch_type = batch_type
         self.images, self.factor_values, self.factor_classes = self.load_raw(path, held_out_filter)
 
-        image_transforms = trans.ToTensor()
+        # image_transforms = [trans.ToTensor(), trans.Resize((124, 124)), trans.RandomCrop(64)]
+        image_transforms = [trans.ToTensor()]
         if color_format == 'hsv':
-            image_transforms = trans.Compose([trans.Lambda(rgb2hsv), image_transforms])
-        self.transform = image_transforms
+            image_transforms = [trans.Lambda(rgb2hsv)] + image_transforms
+        self.transform = trans.Compose(image_transforms)
 
     def __getitem__(self, idx):
         img = self.transform(self.images[idx])

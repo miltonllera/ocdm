@@ -26,12 +26,12 @@ model:
     - [group_norm, [1]]
     - [relu]
 
-    # A three layer MLP to process each patch
+    # A three layer MLP to process each patch, which shares info
     - [conv, [64, 1, 1, 0], {bias: false}]
     - [group_norm, [1]]
     - [relu]
 
-    - [conv, [64, 1, 1, 0], {bias: false}]
+    - [conv, [64, 3, 1, 1], {bias: false}]
     - [group_norm, [1]]
     - [relu]
 

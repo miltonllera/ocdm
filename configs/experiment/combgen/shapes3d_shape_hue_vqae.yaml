@@ -31,7 +31,7 @@ model:
     - [group_norm, [1]]
     - [relu]
 
-    - [conv, [64, 1, 1, 0], {bias: false}]
+    - [conv, [64, 3, 1, 1], {bias: false}]
     - [group_norm, [1]]
     - [relu]
 
@@ -41,11 +41,11 @@ model:
 
   decoder_config:
     # Three layer stack of convolutions which share information in the middle layer
-    - [conv, [64, 3, 1, 1], {bias: False}]
+    - [conv, [64, 1, 1, 0], {bias: False}]
     - [group_norm, [1]]
     - [relu]
 
-    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [conv, [64, 3, 1, 1], {bias: False}]
     - [group_norm, [1]]
     - [relu]
 
