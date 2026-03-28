@@ -3,12 +3,15 @@ from typing import Callable, Literal
 
 import torch
 import torch.nn as nn
+import torch.optim as opt
 
 from src.nn.init import weights_init
 from src.nn.stochastic import DiagonalGaussian, GumbelSoftmax
 from src.nn.embedding import Quantization
+from src.nn.discriminator import PatchDiscriminator
 from src.nn.utils.parsing import create_sequential
 from src.training.loss import (
+    DiscriminatorHingeLoss,
     ReconstructionLoss,
     UpdatableLoss,
     GaussianKL,
@@ -17,6 +20,8 @@ from src.training.loss import (
 )
 from .base import BaseModel, TrainingInit
 
+
+#------------------------------------ Variational Autoencoders -----------------------------------
 
 class VariationalAutoencoder(BaseModel):
     """Base class for variational autoencoders with common encoder/decoder structure."""
@@ -320,6 +325,8 @@ class WassersteinMMDAE(VariationalAutoencoder):
             self.latent_loss_fn.update_parameters(self.global_step)
 
 
+#-------------------------------------- Discrete Autoencoder -------------------------------------
+
 class DiscreteAutoencoder(BaseModel):
     def __init__(
         self,
@@ -415,6 +422,8 @@ class DiscreteAutoencoder(BaseModel):
         return self.forward(inputs)[0]
 
 
+#---------------------------------- Vector Quantized Autoencoder ---------------------------------
+
 class VectorQuantizedAutoencoder(BaseModel):
     def __init__(
         self,
@@ -444,9 +453,10 @@ class VectorQuantizedAutoencoder(BaseModel):
             assert patch_output.shape[-2:] == (H, W)
             patch_output_size = patch_output.shape[-3]
 
-        # Build GumbelSoftmax latent layer
+        # Build quantization latent layer
         self.latent_proj = nn.Linear(patch_output_size, token_dim)
         self.feature_codebook = Quantization(vocab_size, token_dim, beta)
+
         # Build patch decoder from config
         decoder_input_size = token_dim, H, W
         self.patch_decoder = create_sequential(decoder_input_size, decoder_config)
@@ -545,3 +555,156 @@ class VectorQuantizedAutoencoder(BaseModel):
         batch_idx: int,
     ) -> torch.Tensor:
         return self.validation_step(batch, batch_idx, "test")
+
+
+class VectorQuantizedGAN(VectorQuantizedAutoencoder):
+    def __init__(
+        self,
+        input_size: tuple[int, int, int],
+        training: TrainingInit,
+        encoder_config: list,
+        decoder_config: list,
+        resolution: tuple[int, int] = (16, 16),
+        vocab_size: int = 256,
+        token_dim: int = 64,
+        beta: float = 0.25,
+        discriminator_layers: int = 3,
+        discriminator_first_layer_channels: int = 64,
+        discriminator_learning_rate: float = 0.0001,
+        discriminator_penalty_warmup: int = 10_000,
+        discriminator_update_frequency: int = 100,
+    ):
+        super().__init__(
+            input_size,
+            training,
+            encoder_config,
+            decoder_config,
+            resolution,
+            vocab_size,
+            token_dim,
+            beta
+        )
+
+        self.discriminator_warmup = discriminator_penalty_warmup
+        self.discriminator_update_frequency = discriminator_update_frequency
+        self.discriminator_lr = discriminator_learning_rate
+        self.discriminator = PatchDiscriminator(
+            discriminator_layers, discriminator_first_layer_channels
+        )
+        self.disc_loss = DiscriminatorHingeLoss()
+        self.automatic_optimization = False
+
+    def configure_optimizers(self):
+        vqae_params = (
+            list(self.patch_encoder.parameters()) +
+            list(self.patch_decoder.parameters()) +
+            list(self.latent_proj.parameters()) +
+            list(self.feature_codebook.parameters())
+        )
+        disc_params = list(self.discriminator.parameters())
+        config = self.training_init.initialize(vqae_params)
+        vq_ae_opt = config['optimizer']
+        disc_opt = opt.Adam(disc_params, self.discriminator_lr, betas=[0.5, 0.9])
+
+        return [vq_ae_opt, disc_opt], [config['scheduler']] if 'scheduler' in config else []
+
+    def _step(
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:  # type: ignore
+        inputs, targets = batch
+        recons, z_q, dist = self.forward(inputs)
+        recons_loss = self.recons_loss(recons, targets)
+        codebook_loss = dist.sum() / len(inputs)
+        disc_loss = -(self.discriminator(recons).sum()) / len(inputs)
+        return recons_loss, disc_loss, codebook_loss, recons, z_q
+
+    def _update_discriminator(self, batch):
+        inputs, targets = batch
+        recons = self(inputs)[0]
+        logits_real = self.discriminator(targets)
+        logits_recons = self.discriminator(recons.detach())
+        return self.disc_loss(logits_recons, logits_real)
+
+    def _compute_discriminator_loss_weight(self, rec_loss, disc_loss):
+        if self.trainer.global_step < self.discriminator_warmup:
+            delta = torch.tensor([0.0], device=disc_loss.device)
+        last_layer = self.patch_decoder[-1].weight
+        r_grad = torch.autograd.grad(rec_loss, last_layer, retain_graph=True)[0]
+        d_grad = torch.autograd.grad(disc_loss, last_layer, retain_graph=True)[0]
+        delta = torch.norm(r_grad) / (torch.norm(d_grad) + 1e-6)
+        return torch.clamp(delta, 0.0, 1e4).detach()
+
+    def training_step(
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+    ) -> torch.Tensor:
+        vq_ae_opt, disc_opt = self.optimizers()
+
+        # optimize VQAE
+        vq_ae_opt.zero_grad()
+        recons_loss, adv_loss, codebook_loss, recons, z_q = self._step(batch, batch_idx)
+        delta = self._compute_discriminator_loss_weight(recons_loss, adv_loss)
+        loss = recons_loss + codebook_loss + delta * adv_loss
+        self.manual_backward(loss)
+        vq_ae_opt.step()
+
+        # optimize GAN discriminator
+        disc_opt.zero_grad()
+        disc_loss = self._update_discriminator(batch)
+        self.manual_backward(disc_loss)
+        disc_opt.step()
+
+        self.log_dict(
+            {
+                'train/disc_loss':  disc_loss,
+                "train/loss": loss,
+                "train/recons_loss": recons_loss,
+                "train/codebook_loss": codebook_loss,
+                "train/adv_loss": adv_loss,
+            },
+            on_epoch=False,
+            on_step=True,
+            prog_bar=True,
+            sync_dist=True,
+            rank_zero_only=True
+        )
+
+        return loss
+
+    def validation_step(
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+        phase: Literal["val", "test"] = "val",
+    ) -> torch.Tensor:
+        recons_loss, adv_loss, codebook_loss, _, _ = self._step(batch, batch_idx)
+        disc_loss = self._update_discriminator(batch)
+
+        metrics = {
+            f"{phase}/loss": recons_loss,
+            f"{phase}/codebook_loss": codebook_loss,
+            f"{phase}/adv_loss": adv_loss,
+            f"{phase}/disc_loss": disc_loss,
+        }
+
+        self.log_dict(
+            metrics,
+            on_epoch=True,
+            on_step=False,
+            prog_bar=False,
+            sync_dist=True,
+            rank_zero_only=True
+        )
+
+        return recons_loss + adv_loss
+
+    def test_step(
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+    ) -> torch.Tensor:
+        return self.validation_step(batch, batch_idx, "test")
+

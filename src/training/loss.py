@@ -1,10 +1,11 @@
 from abc import abstractmethod
-from typing import Any, Literal, Optional, Callable
+from typing import Any, Literal, Callable
 from functools import partial
 
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 # import torch.multiprocessing as mp
 from torch.nn.functional import (
     mse_loss,
@@ -329,3 +330,8 @@ class HungarianAssignmentLoss(Loss):
         batch_idx = torch.arange(B).unsqueeze_(-1)
 
         return pairwise_cost[batch_idx, idx_input, idx_targets].sum() / B
+
+
+class DiscriminatorHingeLoss(nn.Module):
+    def forward(self, logits_input, logits_target):
+        return (torch.mean(F.relu(1. - logits_target) + F.relu(1. + logits_input))) / 2

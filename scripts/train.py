@@ -17,6 +17,9 @@ from torchvision.utils import make_grid
 from src.dataset.datamodule import CompositionTaskDataModule, DisentangledDataModule
 from src.training.optim import TrainingInit
 
+import torch
+torch.autograd.set_detect_anomaly(True)
+
 
 rootutils.setup_root(".", cwd=True)
 
