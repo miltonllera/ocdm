@@ -91,7 +91,7 @@ def main(cfg: DictConfig) -> dict[str, float]:
 
     # Train
     _logger.info("Starting training phase...")
-    trainer.fit(model, datamodule=datamodule)
+    trainer.fit(model, datamodule=datamodule, ckpt_path=cfg.get('ckpt_path', None))
 
     _logger.info("Training finished.")
     train_metrics = {k: float(v) for k, v in trainer.callback_metrics.items() if 'train' in k}

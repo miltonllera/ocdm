@@ -26,6 +26,8 @@ paths:
   # path to working directory
   work_dir: ${hydra:runtime.cwd}
 
+ckpt_path: null
+
 hydra:
   run:
     dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}

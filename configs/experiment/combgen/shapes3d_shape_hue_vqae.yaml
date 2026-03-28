@@ -31,7 +31,7 @@ model:
     - [group_norm, [1]]
     - [relu]
 
-    - [conv, [64, 3, 1, 1], {bias: false}]
+    - [conv, [64, 3, 1, 1], {bias: false}]  # share information amongst adjacent patches
     - [group_norm, [1]]
     - [relu]
 
