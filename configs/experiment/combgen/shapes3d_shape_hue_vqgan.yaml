@@ -1,0 +1,96 @@
+# @package _global_
+
+# Basic settings
+condition_name: combgen_shapes3d_shape_hue
+model_name: vqgan
+test: true
+
+dataset:
+  _target_: src.dataset.shapes3d.Shapes3D
+  path: data/datasets/shapes3d/3dshapes.h5
+  held_out_filter: "( shape == 3 ) & ( object_hue > 0.5 )"  # NOTE: parenthesis are important
+
+model:
+  _target_: src.model.autoencoder.VectorQuantizedGAN
+
+  input_size: [3, 64, 64]  # channels, height, width
+  resolution: [16, 16]
+  vocab_size: 256
+  token_dim: 64
+  beta: 1.0
+  discriminator_first_layer_channels: 64
+  discriminator_layers: 3
+  discriminator_learning_rate: 0.0003
+  discriminator_penalty_warmup: 10_000
+
+  # Encoder layers configuration
+  encoder_config:
+    # Create 4x4 patches, which produces 16 x 16 tokens
+    - [conv, [64, 4, 4, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    # A three layer MLP to process each patch, which shares info
+    - [conv, [64, 1, 1, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 3, 1, 1], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+  decoder_config:
+    # Three layer stack of convolutions which share information in the middle layer
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 3, 1, 1], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    # Pixel shuffle for upsampling
+    - [pixel_shuffle, [2], {bias: False}]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 3, 1, 1], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [pixel_shuffle, [2], {bias: False}]
+
+    - [conv, [3, 1, 1, 0]]
+
+training:
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: 0.0003
+    betas: [0.5, 0.9]
+
+  scheduling_metric: val/loss
+
+trainer:
+  _target_: lightning.pytorch.Trainer
+  max_steps: 1_000_000  # must do double because there are two optimizer steps during training
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 10
+  val_check_interval: 10_000
+  check_val_every_n_epoch: null
+  fast_dev_run: false
+  default_root_dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
