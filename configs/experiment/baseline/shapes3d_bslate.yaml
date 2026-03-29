@@ -1,0 +1,66 @@
+# @package _global_
+
+# Basic settings
+condition_name: baseline_shapes3d
+model_name: bslate
+test: true
+
+dataset:
+  _target_: src.dataset.shapes3d.Shapes3D
+  path: data/datasets/shapes3d/3dshapes.h5
+  held_out_filter: null
+
+model:
+  _target_: src.model.grouping.BackboneSLATE
+
+  backbone_type: vqgan  # one of: discrete, vqvae, vqgan
+  backbone_checkpoint: ???  # path to pretrained autoencoder checkpoint
+
+  token_dim: 32
+
+  # Transformer Decoder
+  n_head: 4
+  num_layers: 4
+  ffwd_dim: 192
+  dropout: 0.1
+  use_memory_mask: false
+  _ar_val_batches: 100
+
+  # Slot Attention
+  n_slots: 5
+  slot_size: 64
+  slot_n_iter: 3
+  slot_channels: 1
+  slot_hidden_size: 128
+  slot_approx_implicit_grad: false
+
+training:
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: 0.0003
+
+  schedulers:
+    exponential:
+      _target_: src.training.scheduler.ExponentialLR
+      _partial_: true
+      gamma: 0.99999653  # 0.5 ** (1 / 200000)
+      decay_groups: null
+    warmup:
+      _target_: src.training.scheduler.WarmupLR
+      _partial_: true
+      start_value: 0.0
+      warmup_steps: 30_000
+
+  scheduling_metric: val/loss
+
+trainer:
+  _target_: lightning.pytorch.Trainer
+  max_steps: 500_000
+  gradient_clip_val: 1.0
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 10
+  val_check_interval: 10_000
+  check_val_every_n_epoch: null
+  fast_dev_run: false
+  default_root_dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
