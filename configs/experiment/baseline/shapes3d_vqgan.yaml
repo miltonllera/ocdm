@@ -22,7 +22,6 @@ model:
   discriminator_layers: 3
   discriminator_learning_rate: 0.0003
   discriminator_penalty_warmup: 10_000
-  discriminator_update_frequency: 100
 
   # Encoder layers configuration
   encoder_config:

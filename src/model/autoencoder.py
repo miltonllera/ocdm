@@ -3,6 +3,7 @@ from typing import Callable, Literal
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as opt
 
 from src.nn.init import weights_init
@@ -11,7 +12,7 @@ from src.nn.embedding import Quantization
 from src.nn.discriminator import PatchDiscriminator
 from src.nn.utils.parsing import create_sequential
 from src.training.loss import (
-    DiscriminatorHingeLoss,
+    DiscriminatorLoss,
     ReconstructionLoss,
     UpdatableLoss,
     GaussianKL,
@@ -572,7 +573,6 @@ class VectorQuantizedGAN(VectorQuantizedAutoencoder):
         discriminator_first_layer_channels: int = 64,
         discriminator_learning_rate: float = 0.0001,
         discriminator_penalty_warmup: int = 10_000,
-        discriminator_update_frequency: int = 100,
     ):
         super().__init__(
             input_size,
@@ -586,12 +586,11 @@ class VectorQuantizedGAN(VectorQuantizedAutoencoder):
         )
 
         self.discriminator_warmup = discriminator_penalty_warmup
-        self.discriminator_update_frequency = discriminator_update_frequency
         self.discriminator_lr = discriminator_learning_rate
         self.discriminator = PatchDiscriminator(
             discriminator_layers, discriminator_first_layer_channels
         )
-        self.disc_loss = DiscriminatorHingeLoss()
+        self.disc_loss = DiscriminatorLoss('hinge')
         self.automatic_optimization = False
 
     def configure_optimizers(self):
@@ -612,17 +611,21 @@ class VectorQuantizedGAN(VectorQuantizedAutoencoder):
         self,
         batch: tuple[torch.Tensor, torch.Tensor],
         batch_idx: int,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:  # type: ignore
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         inputs, targets = batch
         recons, z_q, dist = self.forward(inputs)
         recons_loss = self.recons_loss(recons, targets)
         codebook_loss = dist.sum() / len(inputs)
-        disc_loss = -(self.discriminator(recons).sum()) / len(inputs)
+        disc_logits = self.discriminator(recons)
+        if self.disc_loss.loss_type == 'bce':
+            disc_loss = F.binary_cross_entropy_with_logits(
+                disc_logits, torch.ones_like(disc_logits)
+            )
+        else:
+            disc_loss = -torch.mean(disc_logits)
         return recons_loss, disc_loss, codebook_loss, recons, z_q
 
-    def _update_discriminator(self, batch):
-        inputs, targets = batch
-        recons = self(inputs)[0]
+    def _update_discriminator(self, recons, targets):
         logits_real = self.discriminator(targets)
         logits_recons = self.discriminator(recons.detach())
         return self.disc_loss(logits_recons, logits_real)
@@ -653,7 +656,8 @@ class VectorQuantizedGAN(VectorQuantizedAutoencoder):
 
         # optimize GAN discriminator
         disc_opt.zero_grad()
-        disc_loss = self._update_discriminator(batch)
+        _, targets = batch
+        disc_loss = self._update_discriminator(recons, targets)
         self.manual_backward(disc_loss)
         disc_opt.step()
 
@@ -680,8 +684,9 @@ class VectorQuantizedGAN(VectorQuantizedAutoencoder):
         batch_idx: int,
         phase: Literal["val", "test"] = "val",
     ) -> torch.Tensor:
-        recons_loss, adv_loss, codebook_loss, _, _ = self._step(batch, batch_idx)
-        disc_loss = self._update_discriminator(batch)
+        _, targets = batch
+        recons_loss, adv_loss, codebook_loss, recons, _ = self._step(batch, batch_idx)
+        disc_loss = self._update_discriminator(recons, targets)
 
         metrics = {
             f"{phase}/loss": recons_loss,

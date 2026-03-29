@@ -332,6 +332,17 @@ class HungarianAssignmentLoss(Loss):
         return pairwise_cost[batch_idx, idx_input, idx_targets].sum() / B
 
 
-class DiscriminatorHingeLoss(nn.Module):
+class DiscriminatorLoss(nn.Module):
+    def __init__(self, loss_type: Literal['hinge', 'bce'] = 'hinge'):
+        super().__init__()
+        self.loss_type = loss_type
+
     def forward(self, logits_input, logits_target):
-        return (torch.mean(F.relu(1. - logits_target) + F.relu(1. + logits_input))) / 2
+        if self.loss_type == 'hinge':
+            return 0.5 * (torch.mean(F.relu(1. - logits_target) + F.relu(1. + logits_input)))
+        elif self.loss_type == 'bce':
+            ones = logits_input.new_ones(logits_input.shape)
+            zeros = torch.zeros_like(ones)
+            return 0.5 * (logits_bce(logits_target, ones) + logits_bce(logits_input, zeros))
+        else:
+            raise RuntimeError("Unrecognized loss type")
