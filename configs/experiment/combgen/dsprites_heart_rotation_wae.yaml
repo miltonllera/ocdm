@@ -19,7 +19,7 @@ dataset:
 
 # Model configuration
 model:
-  _target_: src.model.autoencoder.WassersteinMMDAE
+  _target_: src.model.vae.WassersteinMMDAE
   input_size: [1, 64, 64]  # channels, height, width
 
   # Encoder layers configuration

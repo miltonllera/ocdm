@@ -5,8 +5,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 from tqdm import tqdm
 
-from src.model.autoencoder import BetaVAE, WassersteinMMDAE
-from src.model.grouping import SlotAutoencoder, FigureGroundAutoencoder
+from src.model.vae import BetaVAE, WassersteinMMDAE
+from src.model.slot import SlotAutoencoder, FigureGroundAutoencoder
 from src.model.regression import Regressor, AdversarialDiscriminator
 from src.dataset.dsprites import DSprites
 from src.dataset.shapes3d import Shapes3D

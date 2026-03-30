@@ -11,7 +11,7 @@ dataset:
   held_out_filter: null
 
 model:
-  _target_: src.model.grouping.SLATE
+  _target_: src.model.slate.SLATE
 
   backbone_type: vqgan  # one of: discrete, vqvae, vqgan
   backbone_checkpoint: ???  # path to pretrained autoencoder checkpoint

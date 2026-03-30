@@ -19,7 +19,7 @@ dataset:
 
 # Model configuration
 model:
-  _target_: src.model.grouping.FigureGroundAutoencoder
+  _target_: src.model.slot.FigureGroundAutoencoder
   input_size: [1, 64, 64]  # channels, height, width (assuming grayscale, will adapt based on data)
 
   # Encoder layers configuration

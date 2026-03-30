@@ -15,7 +15,7 @@ dataset:
 model:
   _target_: src.model.regression.AdversarialDiscriminator
   input_size: [1, 64, 64]  # channels, height, width (assuming grayscale, will adapt based on data)
-  model_class: ${get_cls:src.model.autoencoder.BetaVAE}
+  model_class: ${get_cls:src.model.vae.BetaVAE}
   model_ckpt: "data/results/figure1/combgen_dsprites_heart_position_vae_on:2025-11-12_13-45/epoch=490-step=471360.ckpt" # ToDo: find baseline VAE model
 
   # Encoder layers configuration

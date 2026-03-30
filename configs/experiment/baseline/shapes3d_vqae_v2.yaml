@@ -11,7 +11,7 @@ dataset:
   held_out_filter: null
 
 model:
-  _target_: src.model.autoencoder.VectorQuantizedAutoencoder
+  _target_: src.model.dae.VectorQuantizedAutoencoder
 
   input_size: [3, 64, 64]  # channels, height, width
   resolution: [16, 16]

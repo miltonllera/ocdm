@@ -8,8 +8,8 @@ from transformers import AutoModel, AutoProcessor
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.model.autoencoder import BetaVAE, WassersteinMMDAE
-from src.model.grouping import SlotAutoencoder, FigureGroundAutoencoder
+from src.model.vae import BetaVAE, WassersteinMMDAE
+from src.model.slot import SlotAutoencoder, FigureGroundAutoencoder
 from src.dataset.dsprites import DSprites
 from src.dataset.shapes3d import Shapes3D
 from src.dataset.pentominos import Pentominos

@@ -15,7 +15,7 @@ dataset:
   # val_split: 0.2
 
 model:
-  _target_: src.model.autoencoder.DiscreteAutoencoder
+  _target_: src.model.dae.DiscreteAutoencoder
 
   # SLATE specific params
   input_size: [3, 64, 64]  # channels, height, width

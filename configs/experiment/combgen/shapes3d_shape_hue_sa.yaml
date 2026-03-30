@@ -16,7 +16,7 @@ dataset:
   # val_split: 0.2
 
 model:
-  _target_: src.model.grouping.SlotAutoencoder
+  _target_: src.model.slot.SlotAutoencoder
   input_size: [3, 64, 64]  # channels, height, width (RGB)
 
   # Encoder layers configuration
