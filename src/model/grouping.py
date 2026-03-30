@@ -475,7 +475,7 @@ class SLATE(BaseModel):
         return self.autoregressive_recons(slots)[0]
 
     def embed(self, inputs):
-        tokens = self.backbone.embed(inputs)[0]
+        tokens = self.backbone.embed(inputs)
         return self.slot(tokens)[0]
 
     def autoregressive_recons(self, slots):

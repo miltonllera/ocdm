@@ -6,6 +6,9 @@ dist_fn = lambda x, y: torch.sum((x - y) ** 2, dim=-1)
 
 
 class Quantization(nn.Module):
+    """
+    Standard quantization layer using a flat codebook which must learn all the possible patch types.
+    """
     def __init__(self, vocab_size, embedding_dim, beta=1.0):
         super().__init__()
         self.beta = beta
@@ -37,6 +40,10 @@ class Quantization(nn.Module):
 
 
 class ResidualQuantization(nn.Module):
+    """
+    Residual quantization layer which decomposes a vector into a sum of residuals. Larger depths
+    mean potentially better approximations.
+    """
     def __init__(self, vocab_size, embedding_dim, depth=4, beta=1.0):
         super().__init__()
         self.beta = beta
@@ -78,6 +85,10 @@ class ResidualQuantization(nn.Module):
 
 
 class CombinatorialQuantization(nn.Module):
+    """
+    Quantization which partitions the encoding space into separate spaces with disjoint codebooks.
+    These can be combined combinatorially to generate the feature at a particular location.
+    """
     def __init__(self, vocab_size, embedding_dim, n_partitions=4, beta=1.0):
         super().__init__()
         self.beta = beta
