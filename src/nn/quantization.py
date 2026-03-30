@@ -75,3 +75,53 @@ class ResidualQuantization(nn.Module):
     def reset_parameters(self):
         with torch.no_grad():
             self.codebook.weight.uniform_(-1/self.vocab_size, 1/self.vocab_size)
+
+
+class CombinatorialQuantization(nn.Module):
+    def __init__(self, vocab_size, embedding_dim, n_partitions=4, beta=1.0):
+        super().__init__()
+        self.beta = beta
+        self.codebook = nn.ModuleList([
+            nn.Embedding(vocab_size, embedding_dim) for _ in range(n_partitions)
+        ])
+
+    @property
+    def vocab_size(self):
+        return self.codebook[0].num_embeddings
+
+    @property
+    def embedding_dim(self):
+        return self.codebook[0].embedding_dim
+
+    @property
+    def n_partitions(self):
+        return len(self.codebook)
+
+    def get_quantization(self, z, i):
+        codebook = self.codebook[i]
+        idx = torch.vmap(
+            lambda x, y: (x - y).abs().sum(-1), in_dims=(0, None)
+        )(z, codebook).argmin(-1)
+        return self.codebook(idx), idx
+
+    def forward(self, z: torch.Tensor, pos=None):
+        z_part, idxs, z_q = z.chunk(self.n_partitions, dim=-1), [], []
+        for i, zp in enumerate(z_part):
+            zp_q, idx = self.get_quantization(zp, i)
+            z_q.append(zp_q)
+            idxs.append(idx)
+
+        z_q = torch.cat(z_q, dim=-1)
+        idxs = torch.stack(idxs, dim=-1)
+        dist = dist_fn(z.detach(), z_q)
+
+        if self.training:
+            dist = 0.5 * (dist + self.beta * dist_fn(z, z_q.detach()))  # commitment loss
+            z_q = z + (z_q - z).detach()  # straight-through estimation
+
+        return z_q, idxs, dist
+
+    def reset_parameters(self):
+        with torch.no_grad():
+            for codebook in self.codebook:
+                codebook.weight.uniform_(-1/ self.vocab_size, 1/ self.vocab_size)  # type: ignore
