@@ -8,7 +8,7 @@ import torch.optim as opt
 
 from src.nn.init import weights_init
 from src.nn.stochastic import DiagonalGaussian, GumbelSoftmax
-from src.nn.embedding import Quantization
+from src.nn.quantization import Quantization
 from src.nn.discriminator import PatchDiscriminator
 from src.nn.utils.parsing import create_sequential
 from src.training.loss import (

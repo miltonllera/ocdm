@@ -27,7 +27,7 @@ class Quantization(nn.Module):
 
         dist = dist_fn(z.detach(), z_q)
         if self.training:
-            dist = (dist + self.beta * dist_fn(z, z_q.detach())) / 2  # commitment loss
+            dist = 0.5 * (dist + self.beta * dist_fn(z, z_q.detach()))  # commitment loss
             z_q = z + (z_q - z).detach()  # straight-through estimation
         return z_q, idx, dist
 

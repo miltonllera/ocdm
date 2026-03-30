@@ -280,8 +280,8 @@ class FigureGroundAutoencoder(BaseModel):
 #---------------------------------------- SLATE variants -----------------------------------------
 
 class SLATE(BaseModel):
-    """SLATE with a pretrained frozen tokenizer backbone (DiscreteAutoencoder, VQ-VAE or VQ-GAN).
-
+    """
+    SLATE with a pretrained frozen tokenizer backbone (DiscreteAutoencoder, VQ-VAE or VQ-GAN).
     Trains only the slot attention + transformer decoder with MeanSquaredError on token embeddings.
     """
 
@@ -484,7 +484,7 @@ class SLATE(BaseModel):
             recons = self.backbone.decode(sampled)
             return recons, sampled
 
-    def sample_tokens(self, slots, use_codebook_emb=False):
+    def sample_tokens(self, slots, use_codebook_emb=True):
         H, W = self.resolution
         slot_proj = self.slot_out_proj(slots)
 
