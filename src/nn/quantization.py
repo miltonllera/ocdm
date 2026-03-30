@@ -34,3 +34,44 @@ class Quantization(nn.Module):
     def reset_parameters(self):
         with torch.no_grad():
             self.codebook.weight.uniform_(-1/self.vocab_size, 1/self.vocab_size)
+
+
+class ResidualQuantization(nn.Module):
+    def __init__(self, vocab_size, embedding_dim, depth=4, beta=1.0):
+        super().__init__()
+        self.beta = beta
+        self.codebook = nn.Embedding(vocab_size, embedding_dim)
+        self.depth = depth
+
+    @property
+    def vocab_size(self):
+        return self.codebook.num_embeddings
+
+    @property
+    def embedding_dim(self):
+        return self.codebook.embedding_dim
+
+    def get_quantization(self, z):
+        idx = torch.vmap(lambda x, y: (x - y).abs().sum(-1), in_dims=(0, None)) (
+            z, self.codebook.weight.detach()
+        ).argmin(-1)
+        return self.codebook(idx), idx
+
+    def forward(self, z: torch.Tensor, pos=None):
+        residual, zq, idxs = z, z.new_zeros((1,)), []
+        for _ in range(self.depth):
+            rq, idx = self.get_quantization(residual)
+            zq = zq + rq
+            residual = residual - rq
+            idxs.append(idx)
+
+        dist = dist_fn(z.detach(), zq)
+        if self.training:
+            dist = 0.5 * (dist + self.beta * dist_fn(z, zq.detach()))  # commitment loss
+            zq = z + (zq - z).detach()  # straight-through estimation
+
+        return zq, torch.stack(idxs, dim=-1), dist
+
+    def reset_parameters(self):
+        with torch.no_grad():
+            self.codebook.weight.uniform_(-1/self.vocab_size, 1/self.vocab_size)
