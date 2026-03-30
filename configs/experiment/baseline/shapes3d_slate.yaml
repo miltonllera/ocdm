@@ -2,31 +2,19 @@
 
 # Basic settings
 condition_name: baseline_shapes3d
-model_name: slate
+model_name: bslate
 test: true
 
 dataset:
   _target_: src.dataset.shapes3d.Shapes3D
-  path: data/datasets/3dshapes/3dshapes.h5
+  path: data/datasets/shapes3d/3dshapes.h5
   held_out_filter: null
-  # color_format: rgb
-  # Performance stuff
-  # num_worker: 4
-  # val_split: 0.2
 
 model:
   _target_: src.model.grouping.SLATE
 
-  # SLATE specific params
-  input_size: [3, 64, 64]  # channels, height, width
-  resolution: [16, 16]
-  vocab_size: 256
-  token_dim: 32
-
-  # Gumbel Softmax
-  tau: 0.1
-  tau_start: 1.0
-  tau_steps: 30_000
+  backbone_type: vqgan  # one of: discrete, vqvae, vqgan
+  backbone_checkpoint: ???  # path to pretrained autoencoder checkpoint
 
   # Transformer Decoder
   n_head: 4
@@ -34,72 +22,15 @@ model:
   ffwd_dim: 192
   dropout: 0.1
   use_memory_mask: false
-  _ar_val_batches: 100_000_000
+  _ar_val_batches: 100
 
   # Slot Attention
-  n_slots: 3
+  n_slots: 5
   slot_size: 64
   slot_n_iter: 3
   slot_channels: 1
   slot_hidden_size: 128
   slot_approx_implicit_grad: false
-
-  # Encoder layers configuration
-  patch_encoder_config:
-    # Create 4x4 patches, which produces 16 x 16 tokens
-    - [conv, [64, 4, 4, 0], {bias: false}]
-    - [group_norm, [1]]
-    - [relu]
-
-    # A three layer MLP to process each patch
-    - [conv, [64, 1, 1, 0], {bias: false}]
-    - [group_norm, [1]]
-    - [relu]
-
-    - [conv, [64, 1, 1, 0], {bias: false}]
-    - [group_norm, [1]]
-    - [relu]
-
-    - [conv, [64, 1, 1, 0], {bias: false}]
-    - [group_norm, [1]]
-    - [relu]
-
-    - [permute, [0, 2, 3, 1]]
-
-  patch_decoder_config:
-    - [permute, [0, 3, 1, 2], {bias: false}]  # Back to channel-first
-
-    # Three layer stack of convolutions which share information in the middle layer
-    - [conv, [64, 1, 1, 0], {bias: False}]
-    - [group_norm, [1]]
-    - [relu]
-
-    - [conv, [64, 3, 1, 1], {bias: False}]
-    - [group_norm, [1]]
-    - [relu]
-
-    - [conv, [64, 1, 1, 0], {bias: False}]
-    - [group_norm, [1]]
-    - [relu]
-
-    # Pixel shuffle for upsampling
-    - [pixel_shuffle, [2], {bias: False}]
-
-    - [conv, [64, 1, 1, 0], {bias: False}]
-    - [group_norm, [1]]
-    - [relu]
-
-    - [conv, [64, 3, 1, 1], {bias: False}]
-    - [group_norm, [1]]
-    - [relu]
-
-    - [conv, [64, 1, 1, 0], {bias: False}]
-    - [group_norm, [1]]
-    - [relu]
-
-    - [pixel_shuffle, [2], {bias: False}]
-
-    - [conv, [3, 1, 1, 0]]
 
 training:
   optimizer:
@@ -110,8 +41,7 @@ training:
     exponential:
       _target_: src.training.scheduler.ExponentialLR
       _partial_: true
-      # gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
-      g0amma: 0.99999653  # 0.5 ** (1 / 200000)
+      gamma: 0.99999653  # 0.5 ** (1 / 200000)
       decay_groups: null
     warmup:
       _target_: src.training.scheduler.WarmupLR

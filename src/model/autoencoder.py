@@ -379,16 +379,26 @@ class DiscreteAutoencoder(BaseModel):
         weights_init(self.patch_encoder)
         weights_init(self.patch_decoder)
 
-    def forward(self, inputs):
+    def forward(self, inputs, hard=None):
         h = self.patch_encoder(inputs).permute(0, 2, 3, 1)
         B, H, W, _ = h.shape
-        z, logits = self.latent(h)
-        features = z.flatten(0, 2) @ self.feature_dict
-        recons = self.patch_decoder(features.unflatten(0, (B, H, W)).permute(0, 3, 1, 2))
-        return recons, z, logits
+        weights, _ = self.latent(h, hard=hard)
+        z_q = weights.flatten(0, 2) @ self.feature_dict
+        recons = self.patch_decoder(z_q.unflatten(0, (B, H, W)).permute(0, 3, 1, 2))
+        return recons, z_q, weights
 
-    def embed(self, inputs):
-        return self.latent(self.patch_encoder(inputs))[0]
+    def embed(self, inputs, hard=None, reshape='undo'):
+        h = self.patch_encoder(inputs).permute(0, 2, 3, 1)
+        weights = self.latent(h, hard=hard)[0]
+        z_q = weights.flatten(0, 2) @ self.feature_dict
+
+        B, _, H, W = h.shape
+        if reshape == 'undo':
+            z_q = z_q.unflatten(0, (B, H, W)).permute(0, 3, 1, 2)
+        elif reshape == 'tokenization':
+            z_q = z_q.unflatten(0, (B, H * W))
+
+        return z_q
 
     def decode(self, z):
         B, _, H, W = z.shape
@@ -483,13 +493,26 @@ class VectorQuantizedAutoencoder(BaseModel):
         recons = self.patch_decoder(z_q)
         return recons, idx, dist
 
-    def embed(self, inputs):
-        return self.feature_codebook(self(inputs)[1])
+    def embed(self, inputs, reshape='tokenization'):
+        h = self.patch_encoder(inputs)
+        z =  self.latent_proj(h.permute(0, 2, 3, 1).flatten(0, 2))
+        z_q, idx, _ = self.feature_codebook(z)
 
-    def decode(self, idx):
-        B, S = idx.shape
+        B, _, H, W = h.shape
+        if reshape == 'undo':
+            z_q = z_q.unflatten(0, (B, H, W)).permute(0, 3, 1, 2)
+        elif reshape == 'tokenization':
+            z_q = z_q.unflatten(0, (B, H * W))
+
+        return z_q
+
+    def decode(self, emb):
+        _, S = emb.shape[:2]
         assert S == self.resolution[0] * self.resolution[1]
-        z_q = self.feature_codebook(idx)
+        if emb.dtype == torch.long:
+            z_q = self.feature_codebook(emb)
+        else:
+            z_q = emb
         return self.patch_decoder(z_q.unflatten(1, (self.resolution)).permute(0, 3, 1, 2))
 
     def reconstruction(self, inputs: torch.Tensor):

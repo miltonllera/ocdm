@@ -9,6 +9,7 @@ from src.model.base import BaseModel, TrainingInit
 from src.nn.init import linear_init
 from src.nn.slot import SlotAttention, FigureGroundSegmentation
 from src.nn.stochastic import GumbelSoftmax, DiagonalGaussian
+from src.nn.spatial import PositionEmbedding2D
 from src.nn.token import SpatialTokenDict, to_onehot
 from src.nn.transformer import TransformerDecoder
 from src.nn.utils.parsing import create_sequential
@@ -279,570 +280,16 @@ class FigureGroundAutoencoder(BaseModel):
 #---------------------------------------- SLATE variants -----------------------------------------
 
 class SLATE(BaseModel):
-    def __init__(
-        self,
-        input_size: tuple[int, int, int],
-        patch_encoder_config: list,
-        patch_decoder_config: list,
-        training: TrainingInit,
-        resolution: tuple[int, int] = (8, 8),
-        vocab_size: int = 4096,
-        token_dim: int = 192,
-        # GumbelSoftmax parameters
-        tau: float = 1.0,
-        tau_start: float | None = None,
-        tau_steps: float | None = None,
-        # SlotAttention parameters
-        n_slots: int = 4,
-        slot_size: int = 192,
-        slot_n_iter: int = 3,
-        slot_channels: int = 1,
-        slot_hidden_size: int = 128,
-        slot_approx_implicit_grad: bool = True,
-        # TransformerDecoder parameters
-        n_head: int = 4,
-        num_layers: int = 4,
-        ffwd_dim: int | None = None,
-        dropout: float = 0.1,
-        # Other parameters
-        use_memory_mask: bool = False,
-        _ar_val_batches: int = 10,
-    ):
-        super().__init__(training)
-        self.save_hyperparameters()
-        H, W = self.resolution = resolution
-
-        # Build patch encoder from config
-        self.patch_encoder = create_sequential(input_size, patch_encoder_config)
-
-        # Get patch encoder output size for latent layer input
-        with torch.no_grad():
-            dummy_input = torch.zeros(1, *input_size)
-            patch_output = self.patch_encoder(dummy_input)
-            assert patch_output.shape[1:-1] == (H, W)
-            patch_output_size = patch_output.shape[-1]
-
-        # Build GumbelSoftmax latent layer
-        self.latent = GumbelSoftmax(
-            input_size=patch_output_size,
-            n_cat=vocab_size,
-            tau=tau,
-            tau_start=tau_start,
-            tau_steps=tau_steps
-        )
-
-        # Build patch decoder from config
-        decoder_input_size = (H, W, vocab_size)
-        self.patch_decoder = create_sequential(decoder_input_size, patch_decoder_config)
-
-        # Build token dictionary and slot attention
-        self.token_dict = SpatialTokenDict(vocab_size, token_dim, H, W)
-
-        self.slot = SlotAttention(
-            input_size=token_dim,
-            n_slots=n_slots,
-            slot_size=slot_size,
-            n_iter=slot_n_iter,
-            slot_channels=slot_channels,
-            hidden_size=slot_hidden_size,
-            approx_implicit_grad=slot_approx_implicit_grad
-        )
-
-        # Build transformer decoder
-        max_seqlen = H * W
-        self.transformer_decoder = TransformerDecoder(
-            max_seqlen=max_seqlen,
-            d_model=token_dim,
-            n_head=n_head,
-            num_layers=num_layers,
-            ffwd_dim=ffwd_dim,
-            dropout=dropout
-        )
-
-        # Projection and output layers
-        self.slot_out_proj = nn.Linear(slot_size, token_dim, bias=False)
-        self.token_logits = nn.Linear(token_dim, vocab_size, bias=False)
-        self.bos_token = nn.Parameter(torch.empty(1, 1, token_dim))
-
-        # Fixed MSE reconstruction loss
-        self.recons_loss = nn.MSELoss(reduction='sum')
-        self.token_loss = ImageTokenLoss()
-
-        self.use_memory_mask = use_memory_mask
-        self._ar_val_batches = _ar_val_batches
-
-        linear_init(self.slot_out_proj, activation=None)
-        linear_init(self.token_logits, activation=None)
-        nn.init.normal_(self.bos_token)
-
-    @property
-    def vocab_size(self):
-        return self.token_dict.vocab_size
-
-    @property
-    def dim(self):
-        return self.token_dict.embedding_dim
-
-    def forward(self, inputs):
-        h = self.patch_encoder(inputs)
-        z, logits = self.latent(h)
-
-        recons = self.patch_decoder(z)
-
-        token_idxs = to_onehot(z)
-        tokens = self.token_dict(token_idxs).flatten(1, 2)
-        tokens = torch.cat(
-            [self.bos_token.expand(len(inputs), -1, -1), tokens],
-            dim=1
-        )
-
-        slot_input = tokens[:, 1:]  # no BOS token in SA input
-        tf_input = tokens[:, :-1]  # right shift Transformer input
-
-        slots, attn_weights = self.slot(slot_input)
-
-        proj = self.slot_out_proj(slots)
-        mask = attn_weights.detach() if self.use_memory_mask else None
-
-        token_logits = self.token_logits(
-            self.transformer_decoder(tf_input, proj, mask)
-        )
-
-        return (
-            recons,
-            (slots, attn_weights),
-            (z, logits),
-            (token_logits, token_idxs.flatten(1, 2))
-        )
-
-    def _step(self, batch, batch_idx, phase):
-        inputs, targets = batch
-        targets = 2 * targets - 1  # re-scale targets to -1; 1
-
-        recons, slots, zs, tokens = self.forward(inputs)
-
-        recons_loss = self.recons_loss(recons, targets) / len(targets)
-        token_loss = self.token_loss(*tokens)
-        loss = recons_loss + token_loss
-
-        metrics = {
-                f"{phase}/loss": loss,
-                f"{phase}/token_xent": token_loss,
-                f"{phase}/reconstruction_term": recons_loss
-            }
-
-        return recons, slots, zs, tokens, metrics
-
-    def training_step(
-        self,
-        batch: tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
-        _, _, _, _, metrics = self._step(batch, batch_idx, "train")
-
-        self.log_dict(
-            metrics,
-            on_step=True,
-            on_epoch=False,
-            prog_bar=True,
-            sync_dist=False,
-            rank_zero_only=True
-        )
-
-        # log tau separately so it doesn't appear in the progress bar
-        self.log(
-            "tau",
-            self.latent.tau,
-            prog_bar=False,
-            on_step=True,
-            on_epoch=False
-        )
-
-        return metrics["train/loss"]
-
-    def validation_step(
-        self,
-        batch: tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int,
-        phase: Literal["val", "test"] = "val"
-    ):
-        _, slots, _, tokens, metrics = self._step(batch, batch_idx, phase)
-
-        if (phase == "test") or (phase == "val" and (batch_idx < self._ar_val_batches)):
-            target_tokens, target_images = tokens[1], batch[1]
-
-            ar_recons, sampled_tokens = self.autoregressive_recons(slots)
-
-            ar_recons_loss = self.recons_loss(ar_recons, target_images) / len(target_images)
-            ar_token_xent = self.token_loss(sampled_tokens, target_tokens)
-
-            metrics[f"{phase}/reconstruction_term"] = ar_recons_loss
-            metrics[f"{phase}/autoregressive_token_xent"] = ar_token_xent
-
-        self.log_dict(
-            metrics,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=False,
-            sync_dist=True,
-            rank_zero_only=True
-        )
-
-        return metrics[f"{phase}/loss"]
-
-    def test_step(
-        self,
-        batch: tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int,
-    ):
-        return self.validation_step(batch, batch_idx, "test")
-
-    def predict(self, inputs: torch.Tensor) -> torch.Tensor:
-        return self.embed(inputs)
-
-    def reconstruction(self, inputs):
-        slots = self.embed(inputs)
-        outputs = (self.autoregressive_recons(slots)[0] + 1) / 2
-        return outputs.clip(0, 1)
-
-    def embed(self, inputs):
-        h = self.patch_encoder(inputs)
-        z, _ = self.latent(h)
-
-        token_idxs = to_onehot(z)
-        tokens = self.token_dict(token_idxs).flatten(1, 2)
-
-        return self.slot(tokens)
-
-    def autoregressive_recons(self, slots):
-        with torch.no_grad():
-            sampled_discrete = self.sample_tokens(
-                *slots).to(dtype=torch.float32)
-
-            recons = self.patch_decoder(
-                sampled_discrete.unflatten(1, self.resolution)
-            )
-
-            return recons, sampled_discrete
-
-    def sample_tokens(self, slots, attn_weights=None):
-        """
-        Sample tokens autoregressively using the Transformer decoder.
-        """
-        H, W = self.resolution
-        slot_proj = self.slot_out_proj(slots)
-
-        if attn_weights is not None and self.use_memory_mask:
-            mask = attn_weights.detach()
-        else:
-            mask = None
-
-        sampled_discrete = []
-        token_inputs = self.bos_token.expand(len(slots), -1, -1)
-
-        for pos in product(range(H), range(W)):
-            u = self.transformer_decoder(token_inputs, slot_proj, mask)[:, -1:]
-            new_token_idx = to_onehot(self.token_logits(u))
-
-            sampled_discrete.append(new_token_idx)
-
-            new_token = self.token_dict(new_token_idx, pos=pos)
-            token_inputs = torch.cat([token_inputs, new_token], dim=1)
-
-        return torch.cat(sampled_discrete, dim=1)
-
-
-class FigureGroundSLATE(BaseModel):
-    def __init__(
-        self,
-        input_size: tuple[int, int, int],
-        patch_encoder_config: list,
-        patch_decoder_config: list,
-        training: TrainingInit,
-        resolution: tuple[int, int] = (8, 8),
-        vocab_size: int = 4096,
-        token_dim: int = 192,
-        # GumbelSoftmax parameters
-        tau: float = 1.0,
-        tau_start: float | None = None,
-        tau_steps: float | None = None,
-        # SlotAttention parameters
-        slot_size: int = 192,
-        slot_n_iter: int = 3,
-        slot_channels: int = 1,
-        slot_hidden_size: int = 128,
-        slot_approx_implicit_grad: bool = True,
-        # TransformerDecoder parameters
-        n_head: int = 4,
-        num_layers: int = 4,
-        ffwd_dim: int | None = None,
-        dropout: float = 0.1,
-        # Other parameters
-        use_memory_mask: bool = False,
-        _ar_val_batches: int = 10,
-    ):
-        super().__init__(training)
-        self.save_hyperparameters()
-        H, W = self.resolution = resolution
-
-        # Build patch encoder from config
-        self.patch_encoder = create_sequential(input_size, patch_encoder_config)
-
-        # Get patch encoder output size for latent layer input
-        with torch.no_grad():
-            dummy_input = torch.zeros(1, *input_size)
-            patch_output = self.patch_encoder(dummy_input)
-            assert patch_output.shape[1:-1] == (H, W)
-            patch_output_size = patch_output.shape[-1]
-
-        # Build GumbelSoftmax latent layer
-        self.latent = GumbelSoftmax(
-            input_size=patch_output_size,
-            n_cat=vocab_size,
-            tau=tau,
-            tau_start=tau_start,
-            tau_steps=tau_steps
-        )
-
-        # Build patch decoder from config
-        decoder_input_size = (H, W, vocab_size)
-        self.patch_decoder = create_sequential(decoder_input_size, patch_decoder_config)
-
-        # Build token dictionary and slot attention
-        self.token_dict = SpatialTokenDict(vocab_size, token_dim, H, W)
-
-        self.slot = FigureGroundSegmentation(
-            input_size=token_dim,
-            latent_size=slot_size,
-            n_iter=slot_n_iter,
-            n_channels=slot_channels,
-            hidden_size=slot_hidden_size,
-            approx_implicit_grad=slot_approx_implicit_grad
-        )
-        self.background_slot = nn.Parameter(torch.empty(slot_size))
-        nn.init.uniform_(self.background_slot)
-
-        # Build transformer decoder
-        max_seqlen = H * W
-        self.transformer_decoder = TransformerDecoder(
-            max_seqlen=max_seqlen,
-            d_model=token_dim,
-            n_head=n_head,
-            num_layers=num_layers,
-            ffwd_dim=ffwd_dim,
-            dropout=dropout
-        )
-
-        # Projection and output layers
-        self.slot_out_proj = nn.Linear(slot_size, token_dim, bias=False)
-        self.token_logits = nn.Linear(token_dim, vocab_size, bias=False)
-        self.bos_token = nn.Parameter(torch.empty(1, 1, token_dim))
-
-        # Fixed MSE reconstruction loss
-        self.recons_loss = nn.MSELoss(reduction='sum')
-        self.token_loss = ImageTokenLoss()
-
-        self.use_memory_mask = use_memory_mask
-        self._ar_val_batches = _ar_val_batches
-
-        linear_init(self.slot_out_proj, activation=None)
-        linear_init(self.token_logits, activation=None)
-        nn.init.normal_(self.bos_token)
-
-    @property
-    def vocab_size(self):
-        return self.token_dict.vocab_size
-
-    @property
-    def dim(self):
-        return self.token_dict.embedding_dim
-
-    def forward(self, inputs):
-        h = self.patch_encoder(inputs)
-        z, logits = self.latent(h)
-
-        recons = self.patch_decoder(z)
-
-        token_idxs = to_onehot(z)
-        tokens = self.token_dict(token_idxs).flatten(1, 2)
-        tokens = torch.cat(
-            [self.bos_token.expand(len(inputs), -1, -1), tokens],
-            dim=1
-        )
-
-        slot_input = tokens[:, 1:]  # no BOS token in SA input
-        tf_input = tokens[:, :-1]  # right shift Transformer input
-
-        slots, attn_weights = self.slot(slot_input)
-        background_slot = torch.tile(self.background_slot[None, None], (len(inputs), 1, 1))
-        slots = torch.cat([slots, background_slot], dim=1)
-
-        proj = self.slot_out_proj(slots)
-        mask = attn_weights.detach() if self.use_memory_mask else None
-
-        token_logits = self.token_logits(
-            self.transformer_decoder(tf_input, proj, mask)
-        )
-
-        return (
-            recons,
-            (slots, attn_weights),
-            (z, logits),
-            (token_logits, token_idxs.flatten(1, 2))
-        )
-
-    def _step(self, batch, batch_idx, phase):
-        inputs, targets = batch
-        targets = 2 * targets - 1
-
-        recons, slots, zs, tokens = self.forward(inputs)
-
-        recons_loss = self.recons_loss(recons, targets) / len(targets)
-        token_loss = self.token_loss(*tokens)
-        loss = recons_loss + token_loss
-
-        metrics = {
-                f"{phase}/loss": loss,
-                f"{phase}/token_xent": token_loss,
-                f"{phase}/reconstruction_term": recons_loss
-            }
-
-        return recons, slots, zs, tokens, metrics
-
-    def training_step(
-        self,
-        batch: tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ):
-        recons, _, _, tokens, metrics = self._step(batch, batch_idx, "train")
-
-        self.log_dict(
-            metrics,
-            on_step=True,
-            on_epoch=False,
-            prog_bar=True,
-            sync_dist=False,
-            rank_zero_only=True
-        )
-
-        # log tau separately so it doesn't appear in the progress bar
-        self.log(
-            "tau",
-            self.latent.tau,
-            prog_bar=False,
-            on_step=True,
-            on_epoch=False
-        )
-
-        return metrics["train/loss"]
-
-    def validation_step(
-        self,
-        batch: tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int,
-        phase: Literal["val", "test"] = "val"
-    ):
-        _, slots, _, tokens, metrics = self._step(batch, batch_idx, phase)
-
-        if (phase == "test") or (phase == "val" and (batch_idx < self._ar_val_batches)):
-            target_tokens, target_images = tokens[1], batch[1]
-
-            ar_recons, sampled_tokens = self.autoregressive_recons(slots)
-
-            ar_recons_loss = self.recons_loss(ar_recons, target_images) / len(target_images)
-            ar_token_xent = self.token_loss(sampled_tokens, target_tokens)
-
-            metrics[f"{phase}/reconstruction_term"] = ar_recons_loss
-            metrics[f"{phase}/autoregressive_token_xent"] = ar_token_xent
-
-        self.log_dict(
-            metrics,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=False,
-            sync_dist=True,
-            rank_zero_only=True
-        )
-
-        return metrics[f"{phase}/loss"]
-
-    def test_step(
-        self,
-        batch: tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int,
-    ):
-        return self.validation_step(batch, batch_idx, "test")
-
-    def predict(self, inputs: torch.Tensor) -> torch.Tensor:
-        return self.embed(inputs)
-
-    def reconstruction(self, inputs):
-        slots, _ = self.embed(inputs)
-        background_slot = torch.tile(self.background_slot[None, None], (len(inputs), 1, 1))
-        slots = torch.cat([slots, background_slot], dim=1)
-        outputs = (self.autoregressive_recons((slots, None))[0] + 1) / 2
-        return outputs.clip(0, 1)
-
-    def embed(self, inputs):
-        h = self.patch_encoder(inputs)
-        z, _ = self.latent(h)
-
-        token_idxs = to_onehot(z)
-        tokens = self.token_dict(token_idxs).flatten(1, 2)
-
-        return self.slot(tokens)
-
-    def autoregressive_recons(self, slots):
-        with torch.no_grad():
-            sampled_discrete = self.sample_tokens(
-                *slots).to(dtype=torch.float32)
-
-            recons = self.patch_decoder(
-                sampled_discrete.unflatten(1, self.resolution)
-            )
-
-            return recons, sampled_discrete
-
-    def sample_tokens(self, slots, attn_weights=None):
-        """
-        Sample tokens autoregressively using the Transformer decoder.
-        """
-        H, W = self.resolution
-        slot_proj = self.slot_out_proj(slots)
-
-        if attn_weights is not None and self.use_memory_mask:
-            mask = attn_weights.detach()
-        else:
-            mask = None
-
-        sampled_discrete = []
-        token_inputs = self.bos_token.expand(len(slots), -1, -1)
-
-        for pos in product(range(H), range(W)):
-            u = self.transformer_decoder(token_inputs, slot_proj, mask)[:, -1:]
-            new_token_idx = to_onehot(self.token_logits(u))
-
-            sampled_discrete.append(new_token_idx)
-
-            new_token = self.token_dict(new_token_idx, pos=pos)
-            token_inputs = torch.cat([token_inputs, new_token], dim=1)
-
-        return torch.cat(sampled_discrete, dim=1)
-
-
-
-class BackboneSLATE(BaseModel):
     """SLATE with a pretrained frozen tokenizer backbone (DiscreteAutoencoder, VQ-VAE or VQ-GAN).
 
-    Trains only the slot attention + transformer decoder with cross-entropy on token IDs.
+    Trains only the slot attention + transformer decoder with MeanSquaredError on token embeddings.
     """
 
     def __init__(
         self,
-        backbone_type: Literal["discrete", "vqvae", "vqgan"],
+        backbone_type: Literal["dae", "vqvae", "vqgan"],
         backbone_checkpoint: str,
         training: TrainingInit,
-        token_dim: int = 192,
         # SlotAttention parameters
         n_slots: int = 4,
         slot_size: int = 192,
@@ -861,15 +308,16 @@ class BackboneSLATE(BaseModel):
         super().__init__(training)
         self.save_hyperparameters()
 
-        backbone = BackboneSLATE._load_backbone(backbone_type, backbone_checkpoint)
+        backbone = SLATE._load_backbone(backbone_type, backbone_checkpoint)
         backbone.requires_grad_(False)
         self.backbone = backbone
         self.backbone_type = backbone_type
 
-        vocab_size = backbone.hparams.vocab_size
-        H, W = self.resolution = tuple(backbone.hparams.resolution)
+        # vocab_size = backbone.hparams.vocab_size  # type: ignore
+        token_dim = backbone.hparams.token_dim  # type: ignore
+        H, W = self.resolution = tuple(backbone.hparams.resolution)  # type: ignore
 
-        self.token_dict = SpatialTokenDict(vocab_size, token_dim, H, W)
+        self.pos_emb = PositionEmbedding2D(token_dim, H, W, 'cardinal')
 
         self.slot = SlotAttention(
             input_size=token_dim,
@@ -892,15 +340,12 @@ class BackboneSLATE(BaseModel):
         )
 
         self.slot_out_proj = nn.Linear(slot_size, token_dim, bias=False)
-        self.token_logits = nn.Linear(token_dim, vocab_size, bias=False)
         self.bos_token = nn.Parameter(torch.empty(1, 1, token_dim))
 
-        self.token_loss = ImageTokenLoss()
         self.use_memory_mask = use_memory_mask
         self._ar_val_batches = _ar_val_batches
 
         linear_init(self.slot_out_proj, activation=None)
-        linear_init(self.token_logits, activation=None)
         nn.init.normal_(self.bos_token)
 
     @staticmethod
@@ -908,7 +353,7 @@ class BackboneSLATE(BaseModel):
         from src.model.autoencoder import (
             DiscreteAutoencoder, VectorQuantizedAutoencoder, VectorQuantizedGAN
         )
-        if backbone_type == "discrete":
+        if backbone_type == "dae":
             return DiscreteAutoencoder.load_from_checkpoint(checkpoint_path)
         elif backbone_type == "vqvae":
             return VectorQuantizedAutoencoder.load_from_checkpoint(checkpoint_path)
@@ -919,85 +364,64 @@ class BackboneSLATE(BaseModel):
 
     @property
     def vocab_size(self):
-        return self.token_dict.vocab_size
+        return self.backbone.hparams.vocab_size  # type: ignore
 
     @property
     def dim(self):
-        return self.token_dict.embedding_dim
+        return self.backbone.hparams.token_dim  # type: ignore
 
-    def _get_token_idxs(self, token_output):
-        """Convert second output of backbone.forward to one-hot [B, H, W, vocab_size]."""
-        if self.backbone_type == "discrete":
-            return to_onehot(token_output)
-        else:
-            return F.one_hot(token_output, self.vocab_size).float()
+    def _nearest_token(self, pred_emb):
+        """Snap predicted embeddings [..., token_dim] to nearest codebook entry.
+        Returns (integer indices [...], codebook embeddings [..., token_dim])."""
+        B, S, _ = pred_emb.shape
 
-    def _decode_tokens(self, token_idxs):
-        """Decode one-hot token indices [B, H*W, vocab_size] to pixel space."""
-        B = len(token_idxs)
-        H, W = self.resolution
         if self.backbone_type == "discrete":
-            features = token_idxs.flatten(0, 1) @ self.backbone.feature_dict
-            return self.backbone.patch_decoder(
-                features.unflatten(0, (B, H, W)).permute(0, 3, 1, 2)
-            )
+            # idx = (pred_emb @ self.backbone.feature_dict.T).argmax(-1)
+            # return idx, self.backbone.feature_dict[idx]  # type: ignore
+            raise NotImplementedError()
         else:
-            print(token_idxs.shape)
-            exit()
-            return self.backbone.decode(token_idxs.argmax(-1))
+            z_q, idx, _ = self.backbone.feature_codebook(pred_emb.flatten(0, -2))  # type: ignore
+            return idx.unflatten(0, (B, S)), z_q.unflatten(0, (B, S))
 
     def forward(self, inputs):
         with torch.no_grad():
-            _, token_idxs, *_ = self.backbone(inputs)
-            print(token_idxs.shape)
-            token_targets = self._get_token_idxs(token_idxs)
+            tokens = self.backbone.embed(inputs, reshape='tokenization')
 
-        print(token_targets.shape)
-        exit()
-
-        tokens = self.token_dict(token_targets).flatten(1, 2)
-        tokens = torch.cat(
-            [self.bos_token.expand(len(inputs), -1, -1), tokens],
-            dim=1
-        )
+        tokens = torch.cat([self.bos_token.expand(len(inputs), -1, -1), tokens], dim=1)
 
         slot_input = tokens[:, 1:]
         tf_input = tokens[:, :-1]
 
         slots, attn_weights = self.slot(slot_input)
-        proj = self.slot_out_proj(slots)
         mask = attn_weights.detach() if self.use_memory_mask else None
+        slot_tokens = self.slot_out_proj(slots)
 
-        token_logits = self.token_logits(
-            self.transformer_decoder(tf_input, proj, mask)
-        )
+        pred_embeddings = self.transformer_decoder(tf_input, slot_tokens, mask)
 
         with torch.no_grad():
-            pred_onehot = F.one_hot(token_logits.argmax(-1), self.vocab_size).float()
-            recons = self._decode_tokens(pred_onehot)
+            recons = self.backbone.decode(pred_embeddings)
 
-        return recons, (slots, attn_weights), (token_logits, token_targets.flatten(1, 2))
+        return recons, (slots, attn_weights), (pred_embeddings, tokens[:, 1:])
 
     def _step(self, batch, batch_idx, phase):
         inputs, targets = batch
-        recons, slots, tokens = self.forward(inputs)
-        token_loss = self.token_loss(*tokens)
+        recons, slots, (pred_embeddings, target_embeddings) = self.forward(inputs)
+        emb_loss = F.mse_loss(pred_embeddings, target_embeddings.detach())
         recons_loss = F.mse_loss(recons, targets, reduction='sum') / len(targets)
 
         metrics = {
-            f"{phase}/loss": token_loss,
-            f"{phase}/token_xent": token_loss,
+            f"{phase}/loss": emb_loss,
             f"{phase}/reconstruction_term": recons_loss,
         }
 
-        return recons, slots, tokens, metrics
+        return recons, slots, metrics
 
     def training_step(
         self,
         batch: tuple[torch.Tensor, torch.Tensor],
         batch_idx: int
     ):
-        _, _, _, metrics = self._step(batch, batch_idx, "train")
+        _, _, metrics = self._step(batch, batch_idx, "train")
 
         self.log_dict(
             metrics,
@@ -1016,20 +440,14 @@ class BackboneSLATE(BaseModel):
         batch_idx: int,
         phase: Literal["val", "test"] = "val"
     ):
-        _, slots, tokens, metrics = self._step(batch, batch_idx, phase)
+        _, slots, metrics = self._step(batch, batch_idx, phase)
 
         if (phase == "test") or (phase == "val" and batch_idx < self._ar_val_batches):
-            target_tokens, target_images = tokens[1], batch[1]
-
-            ar_recons, sampled_tokens = self.autoregressive_recons(slots)
-
-            ar_recons_loss = nn.functional.mse_loss(
-                ar_recons, target_images, reduction='sum'
-            ) / len(target_images)
-            ar_token_xent = self.token_loss(sampled_tokens, target_tokens)
-
-            metrics[f"{phase}/ar_reconstruction_term"] = ar_recons_loss
-            metrics[f"{phase}/autoregressive_token_xent"] = ar_token_xent
+            ar_recons, _ = self.autoregressive_recons(slots)
+            ar_recons_loss = F.mse_loss(
+                ar_recons, batch[1], reduction='sum'
+            ) / len(batch[1])
+            metrics[f"{phase}/ar_sample_loss"] = ar_recons_loss
 
         self.log_dict(
             metrics,
@@ -1057,40 +475,33 @@ class BackboneSLATE(BaseModel):
         return self.autoregressive_recons(slots)[0]
 
     def embed(self, inputs):
-        with torch.no_grad():
-            _, token_output, *_ = self.backbone(inputs)
-            token_idxs = self._get_token_idxs(token_output)
-        tokens = self.token_dict(token_idxs).flatten(1, 2)
-        return self.slot(tokens)
+        tokens = self.backbone.embed(inputs)[0]
+        return self.slot(tokens)[0]
 
     def autoregressive_recons(self, slots):
         with torch.no_grad():
-            sampled_discrete = self.sample_tokens(*slots).to(dtype=torch.float32)
-            recons = self._decode_tokens(sampled_discrete)
-            return recons, sampled_discrete
+            sampled = self.sample_tokens(slots[0]).to(dtype=torch.float32)
+            recons = self.backbone.decode(sampled)
+            return recons, sampled
 
-    def sample_tokens(self, slots, attn_weights=None):
+    def sample_tokens(self, slots, use_codebook_emb=False):
         H, W = self.resolution
         slot_proj = self.slot_out_proj(slots)
 
-        if attn_weights is not None and self.use_memory_mask:
-            mask = attn_weights.detach()
-        else:
-            mask = None
-
-        sampled_discrete = []
+        sampled = []
         token_inputs = self.bos_token.expand(len(slots), -1, -1)
 
         for pos in product(range(H), range(W)):
-            u = self.transformer_decoder(token_inputs, slot_proj, mask)[:, -1:]
-            new_token_idx = to_onehot(self.token_logits(u))
-
-            sampled_discrete.append(new_token_idx)
-
-            new_token = self.token_dict(new_token_idx, pos=pos)
+            pred_emb = self.transformer_decoder(token_inputs, slot_proj, None)[:, -1:]
+            if use_codebook_emb:
+                _, new_codebook_emb = self._nearest_token(pred_emb)
+            else:
+                new_codebook_emb=pred_emb
+            sampled.append(new_codebook_emb)
+            new_token = self.pos_emb(new_codebook_emb, pos=pos)
             token_inputs = torch.cat([token_inputs, new_token], dim=1)
 
-        return torch.cat(sampled_discrete, dim=1)
+        return torch.cat(sampled, dim=1)
 
 
 #---------------------------------------- Control Models -----------------------------------------
