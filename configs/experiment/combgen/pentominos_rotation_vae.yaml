@@ -8,9 +8,10 @@ test: true
 # Dataset configuration
 dataset:
   _target_: src.dataset.pentominos.Pentominos
-  path: data/datasets/pentominos_colored/
+  path: data/datasets/pentominos/
   prediction_type: unsupervised
-  held_out_filter: "np.isin( shape , [1, 3, 5, 8] ) & ( angle >= 180 )"
+  # held_out_filter: "np.isin( shape , [1, 3, 5, 8] ) & ( angle >= 180 )"
+  held_out_filter: "( shape == 6 ) & ( angle >= 180 )"
   rebalance_dim: shape
 
   # Performance stuff

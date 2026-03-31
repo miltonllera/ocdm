@@ -66,14 +66,14 @@ training:
     warmup:
       _target_: torch.optim.lr_scheduler.LinearLR
       start_factor: 0.1
-      total_iters: 1000
+      total_iters: 10_000
 
   scheduling_metric: val/loss
 
 # Trainer configuration
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_steps: 300_000
+  max_steps: 500_000
   gradient_clip_val: 1.0
   accelerator: auto
   devices: auto
