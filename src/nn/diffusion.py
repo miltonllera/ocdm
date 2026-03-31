@@ -46,10 +46,9 @@ class DiffusionDenoiser(nn.Module):
         self,
         spatial_size: tuple[int, int],
         d_model: int,
-        slot_size: int,
         n_head: int,
         num_layers: int,
-        ffwd_dim: int,
+        ffwd_dim: int | None = 192,
         dropout: float = 0.0,
         neighborhood_radius: int = 1,
     ) -> None:
@@ -60,7 +59,6 @@ class DiffusionDenoiser(nn.Module):
         self.spatial_size = spatial_size
 
         self.pos_emb = PositionEmbedding2D(d_model, H, W, embed='cardinal')
-        self.slot_proj = nn.Linear(slot_size, d_model, bias=False)
 
         decoder_layer = nn.TransformerDecoderLayer(
             d_model, n_head, ffwd_dim, dropout,
@@ -78,26 +76,23 @@ class DiffusionDenoiser(nn.Module):
         return len(self.decoder.layers)
 
     def _reset_parameters(self) -> None:
-        linear_init(self.slot_proj, activation=None)
         linear_init(self.out_proj, activation=None)
         gain = (3 * self.num_layers) ** (-0.5)
         for layer in self.decoder.layers:
-            linear_init(layer.self_attn.out_proj, activation=None, gain=gain)
-            linear_init(layer.multihead_attn.out_proj, activation=None, gain=gain)
+            linear_init(layer.self_attn.out_proj, activation=None, gain=gain)  # type: ignore
+            linear_init(layer.multihead_attn.out_proj, activation=None, gain=gain)  # type: ignore
             linear_init(layer.linear2, activation=None, gain=gain)
 
     def forward(
         self,
         tokens: torch.Tensor,   # (batch, H*W, d_model)
-        slots: torch.Tensor,    # (batch, n_slots, slot_size)
+        memory: torch.Tensor,    # (batch, n_tokens, token_dim)
         t: torch.Tensor,        # (batch,) int
     ) -> torch.Tensor:          # (batch, H*W, d_model)
         H, W = self.spatial_size
 
         tgt = self.pos_emb(tokens.unflatten(1, (H, W))).flatten(1, 2)
         tgt = tgt + sinusoidal_timestep_embedding(t, self.d_model).unsqueeze(1)
-
-        memory = self.slot_proj(slots)
         tgt = self.decoder(tgt, memory, tgt_mask=self.attn_mask, tgt_is_causal=False)
 
         return self.out_proj(tgt)
