@@ -99,7 +99,7 @@ class DSprites(Dataset):
         data_filter: Callable | None = None,
     ):
         if path is None:
-            path = Path(self.files['train'])
+            path = Path(self.files['train'])  # type: ignore
 
         self.batch_type = batch_type
         self.images, self.factor_values, self.factor_classes = self.load_raw(path, data_filter)

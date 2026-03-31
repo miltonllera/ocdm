@@ -72,14 +72,14 @@ class Shapes3D(Dataset):
             "regress_latent_values",
             "regress_latent_classes"
         ] = "unsupervised",
-        held_out_filter: Callable | None = None,
+        data_filter: Callable | None = None,
         color_format: Literal["rgb", "hsv"] = "rgb",
     ):
         if path is None:
             path = Path(self.files['train'])
 
         self.batch_type = batch_type
-        self.images, self.factor_values, self.factor_classes = self.load_raw(path, held_out_filter)
+        self.images, self.factor_values, self.factor_classes = self.load_raw(path, data_filter)
 
         # image_transforms = [trans.ToTensor(), trans.Resize((124, 124)), trans.RandomCrop(64)]
         image_transforms = [trans.ToTensor()]

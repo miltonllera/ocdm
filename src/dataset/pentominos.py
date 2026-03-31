@@ -31,13 +31,13 @@ class Pentominos(Dataset):
         self,
         path: str,
         prediction_type: str = 'unsupervised',
-        held_out_filter: Callable = None,
+        data_filter: Callable | None = None,
     ) -> None:
         (
             image_files,
             factor_values,
             factor_classes
-        ) = self.load_raw(path, held_out_filter)
+        ) = self.load_raw(path, data_filter)
 
         self.image_files = image_files
         self.factor_values = factor_values
