@@ -48,7 +48,7 @@ model:
   n_iter: 3
   slot_channels: 1
   slot_hidden_size: 128
-  approx_implicit_grad: true
+  approx_implicit_grad: false
 
 training:
   optimizer:

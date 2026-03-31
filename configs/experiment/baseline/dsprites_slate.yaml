@@ -43,7 +43,7 @@ model:
   slot_n_iter: 3
   slot_channels: 4
   slot_hidden_size: 192
-  slot_approx_implicit_grad: true
+  slot_approx_implicit_grad: false
 
   # Encoder layers configuration
   patch_encoder_config:

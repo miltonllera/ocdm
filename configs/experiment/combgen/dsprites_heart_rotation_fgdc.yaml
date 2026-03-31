@@ -52,7 +52,7 @@ model:
   slot_size: 16
   n_iter: 3
   slot_hidden_size: 128
-  approx_implicit_grad: true
+  approx_implicit_grad: false
 
 # Training configuration
 training:
