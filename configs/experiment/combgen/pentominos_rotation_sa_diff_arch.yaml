@@ -1,0 +1,124 @@
+# @package _global_
+
+# Basic settings
+condition_name: combgen_pentominos_rotation
+model_name: sa_diff_arch
+test: true
+
+# Dataset configuration
+dataset:
+  _target_: src.dataset.pentominos.Pentominos
+  path: data/datasets/pentominos/
+  prediction_type: unsupervised
+  # held_out_filter: "np.isin( shape , [4, 5, 6, 8,] ) & ( angle >= 180 )"
+  held_out_filter: "( shape == 6 ) & ( angle >= 180 )"
+  rebalance_dim: shape
+
+# Model configuration
+model:
+  _target_: src.model.slot.FigureGroundAutoencoder
+  input_size: [1, 64, 64]  # channels, height, width (RGB)
+
+  # Encoder layers configuration
+  encoder_config:
+    # Create 4x4 patches, which produces 16 x 16 tokens
+    - [conv, [64, 4, 4, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    # A three layer MLP to process each patch, which shares info
+    - [conv, [64, 1, 1, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 3, 1, 1], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [permute, [0, 2, 3, 1]]
+    - [posemb2d, {embed: cardinal}]
+    - [flatten, [1, 2]]
+
+    - [layer_norm, [-1]]
+
+  # Decoder layers configuration
+  decoder_config:
+    - [spatbroad, [16, 16], {input_last: True}]
+    - [posemb2d, {embed: cardinal}]
+    - [permute, [0, 3, 1, 2]]
+
+    # Three layer stack of convolutions which share information in the middle layer
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 3, 1, 1], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    # Pixel shuffle for upsampling
+    - [pixel_shuffle, [2], {bias: False}]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 3, 1, 1], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [pixel_shuffle, [2], {bias: False}]
+
+    - [conv, [2, 1, 1, 0]]
+
+  # Slot Attention parameters
+  slot_size: 16
+  n_iter: 3
+  slot_channels: 1
+  slot_hidden_size: 128
+  approx_implicit_grad: false
+
+# Training configuration
+training:
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: 0.0003
+
+  schedulers:
+    exponential:
+      _target_: src.training.scheduler.ExponentialLR
+      _partial_: true
+      gamma: 0.99999653  # 0.5 ** (1 / 200000)
+      decay_groups: null
+    warmup:
+      _target_: src.training.scheduler.WarmupLR
+      _partial_: true
+      start_value: 0.0
+      warmup_steps: 20_000
+
+  scheduling_metric: val/loss
+
+# Trainer configuration
+trainer:
+  _target_: lightning.pytorch.Trainer
+  max_steps: 500_000
+  gradient_clip_val: 1.0
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 10
+  val_check_interval: 5000
+  check_val_every_n_epoch: null
+  fast_dev_run: false
+  default_root_dir: ${paths.log_dir}/figure2/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}

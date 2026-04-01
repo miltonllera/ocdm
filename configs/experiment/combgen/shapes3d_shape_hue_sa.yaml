@@ -43,7 +43,7 @@ model:
     - [relu]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
-    - [tconv, [4, 1, 1, 0]]
+    - [conv, [4, 1, 1, 0]]
 
   # Slot Attention parameters
   n_slots: 4
@@ -59,11 +59,11 @@ training:
     lr: 0.0003
 
   schedulers:
-    # exponential:
-    #   _target_: src.training.scheduler.ExponentialLR
-    #   _partial_: true
-    #   gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
-    #   decay_groups: null
+    exponential:
+      _target_: src.training.scheduler.ExponentialLR
+      _partial_: true
+      gamma: 0.99999653  # 0.5 ** (1 / 200000)
+      decay_groups: null
     warmup:
       _target_: src.training.scheduler.WarmupLR
       _partial_: true
