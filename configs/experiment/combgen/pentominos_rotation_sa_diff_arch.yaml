@@ -44,6 +44,8 @@ model:
     - [flatten, [1, 2]]
 
     - [layer_norm, [-1]]
+    - [linear, [64]]
+    - [relu]
 
   # Decoder layers configuration
   decoder_config:
