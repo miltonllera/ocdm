@@ -43,7 +43,7 @@ model:
     - [relu]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
-    - [conv, [4, 1, 1, 0]]
+    - [tconv, [4, 1, 1, 0]]
 
   # Slot Attention parameters
   n_slots: 4
