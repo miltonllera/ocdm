@@ -27,7 +27,7 @@ class SlotDiffusion(BaseModel):
         slot_hidden_size: int = 128,
         slot_approx_implicit_grad: bool = True,
         noise_schedule: str = 'cosine',
-        noise_schedule_steps: int = 1000,
+        noise_schedule_steps: int = 50,
         noise_schedule_betas: tuple[float, float] = (0.0, 1.0),
         n_head: int = 4,
         num_layers: int = 4,
@@ -96,16 +96,14 @@ class SlotDiffusion(BaseModel):
             raise ValueError(f"Unknown backbone_type: {backbone_type!r}")
 
     def apply_noise(self, inputs):
-        t = torch.randint(0, self.noise_schedule_steps, (len(inputs),), device=inputs.device)
-        t = (t + 1).to(torch.float32)
+        t = torch.randint(0, self.noise_schedule_steps, (len(inputs),))
 
-        alpha_bar_t = (self.noise_schedule['alphas_bar'])
-        alpha_bar_t = alpha_bar_t[:, *([None] * (len(inputs) - 1))].to(inputs.device)
-
+        alpha_bar_t = self.noise_schedule['alphas_bar'][t]
+        alpha_bar_t = alpha_bar_t[:, *([None] * (len(inputs.shape) - 1))].to(inputs.device)
         noise = torch.randn_like(inputs)
         x_t = torch.sqrt(alpha_bar_t) * inputs + torch.sqrt(1 - alpha_bar_t) * noise
 
-        return x_t, noise, t
+        return x_t, noise, t.to(inputs.device)
 
     def denoise(self, slots):
         slot_tokens = self.slot_proj(slots)
@@ -114,24 +112,25 @@ class SlotDiffusion(BaseModel):
             (len(slots), *self.resolution, self.token_dim), device=slots.device
         ).flatten(1, 2)
 
-        for t in range(self.noise_schedule_steps + 1, 1, -1):
+        for t in range(self.noise_schedule_steps - 1, -1, -1):
             beta = self.noise_schedule['betas'][t].to(x_t.device)
             alpha = self.noise_schedule['alphas'][t].to(x_t.device)
             alpha_bar = self.noise_schedule['alphas_bar'][t].to(x_t.device)
             # std = torch.sqrt( 1 - self.noise_schedule['alpha_bar'][t - 1] / (1 - alpha_bar))
             std = torch.sqrt(beta)
 
+            t = torch.tensor([t], device=x_t.device)
             pred_noise = self.denoiser(x_t, slot_tokens, t)
+
             x_t = (
                 1 / torch.sqrt(alpha) * x_t -
                 (1 - alpha) / torch.sqrt(alpha * (1 - alpha_bar)) * pred_noise
             )
 
-            if t > 1:
+            if t > 0:
                 x_t = x_t + std * torch.randn_like(x_t)
 
         return x_t
-
 
     def forward(self, inputs):
         with torch.no_grad():
@@ -157,9 +156,14 @@ class SlotDiffusion(BaseModel):
         denoised = self.denoise(slot_tokens)
         return self.backbone.decode(denoised)
 
+    def _step(self, batch):
+        return self.forward(batch)
+
     def training_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int):
-        (noise, pred_noise, _), (_, _), (_, _) = self.forward(batch)
-        loss = F.mse_loss(noise, pred_noise)
+        inputs, targets = batch
+        (noise, pred_noise, _), (_, _), (_, _) = self.forward(inputs)
+        loss = F.mse_loss(noise, pred_noise, reduction='sum') / len(targets)
+
         self.log(
             'train/loss',
             loss,
@@ -177,23 +181,24 @@ class SlotDiffusion(BaseModel):
         batch_idx: int,
         phase: str = 'val'
     ):
-        (noise, pred_noise, _), (slots, _), (tokens, _) = self.forward(batch)
+        inputs, targets = batch
+        (noise, pred_noise, _), (slots, _), (tokens, _) = self.forward(inputs)
         denoised_tokens = self.denoise(slots)
         recons = self.backbone.decode(denoised_tokens)
 
-        loss = F.mse_loss(noise, pred_noise)
-        denoising_loss = F.mse_loss(denoised_tokens, tokens)
-        recons_loss = F.mse_loss(recons, batch[0])
+        loss = F.mse_loss(noise, pred_noise, reduction='sum') / len(targets)
+        denoising_loss = F.mse_loss(denoised_tokens, tokens, reduction='sum') / len(targets)
+        recons_loss = F.mse_loss(recons, targets, reduction='sum') / len(targets)
 
         self.log_dict(
             {
-                f'{phase}/loss': loss,
-                f'{phase}/token_loss': denoising_loss,
-                f'{phase}/recons_loss': recons_loss,
+                f"{phase}/loss": loss,
+                f"{phase}/token_loss": denoising_loss,
+                f"{phase}/recons_loss": recons_loss,
             },
-            on_step=True,
-            on_epoch=False,
-            prog_bar=True,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
             sync_dist=False,
             rank_zero_only=True
         )

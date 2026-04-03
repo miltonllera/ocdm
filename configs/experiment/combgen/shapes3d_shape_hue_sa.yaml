@@ -22,16 +22,16 @@ model:
   # Encoder layers configuration
   encoder_config:
     - [conv, [64, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
-    - [lrelu]
+    - [relu]
     - [conv, [64, 4, 2, 1]]
-    - [lrelu]
+    - [relu]
     - [conv, [64, 4, 2, 1]]
-    - [lrelu]
+    - [relu]
     - [permute, [0, 2, 3, 1]]  # Change to channel-last for position embedding
     - [posemb2d, {embed: cardinal}]
     - [flatten, [1, 2]]
     - [layer_norm, [-1]]
-    - [linear, [256]]
+    - [linear, [64]]
     - [lrelu]
 
   # Decoder layers configuration
@@ -40,11 +40,11 @@ model:
     - [posemb2d, {embed: cardinal}]
     - [permute, [0, 3, 1, 2]]
     - [conv, [64, 1, 1, 0]]
-    - [lrelu]
+    - [relu]
     - [tconv, [64, 4, 2, 1]]
-    - [lrelu]
+    - [relu]
     - [tconv, [64, 4, 2, 1]]
-    - [lrelu]
+    - [relu]
     - [tconv, [4, 4, 2, 1]]
 
   # Slot Attention parameters

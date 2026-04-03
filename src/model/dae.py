@@ -184,10 +184,12 @@ class VectorQuantizedAutoencoder(BaseModel):
         _, S = emb.shape[:2]
         assert S == self.resolution[0] * self.resolution[1]
         if emb.dtype == torch.long:
-            z_q = self.feature_codebook(emb)
+            z_q = self.feature_codebook.codebook(emb.flatten(0, 1))
         else:
-            z_q = emb
-        return self.patch_decoder(z_q.unflatten(1, (self.resolution)).permute(0, 3, 1, 2))
+            z_q = self.feature_codebook(emb.flatten(0, 1))[0]
+
+        z_q = z_q.unflatten(0, (len(emb), *self.resolution)).permute(0, 3, 1, 2)
+        return self.patch_decoder(z_q)
 
     def reconstruction(self, inputs: torch.Tensor):
         return self.forward(inputs)[0]

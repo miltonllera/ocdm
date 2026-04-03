@@ -32,7 +32,6 @@ def local_2d_mask(H: int, W: int, radius: int = 1) -> torch.Tensor:
 
 
 def sinusoidal_timestep_embedding(t: torch.Tensor, d_model: int) -> torch.Tensor:
-    """t: (batch,) int -> (batch, d_model)."""
     half = d_model // 2
     freqs = torch.exp(
         -math.log(10000) * torch.arange(half, dtype=torch.float32, device=t.device) / half

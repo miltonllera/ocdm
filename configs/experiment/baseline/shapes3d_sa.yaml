@@ -48,7 +48,7 @@ model:
     - [tconv, [4, 4, 2, 1]]
 
   # Slot Attention parameters
-  n_slots: 4
+  n_slots: 5
   slot_size: 10
   n_iter: 3
   slot_channels: 1
