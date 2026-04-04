@@ -36,16 +36,16 @@ training:
     lr: 0.0003
 
   schedulers:
-    # exponential:
-    #   _target_: src.training.scheduler.ExponentialLR
-    #   _partial_: true
-    #   gamma: 0.99999653  # 0.5 ** (1 / 200000)
-    #   decay_groups: null
+    exponential:
+      _target_: src.training.scheduler.ExponentialLR
+      _partial_: true
+      gamma: 0.99999653  # 0.5 ** (1 / 200000)
+      decay_groups: null
     warmup:
       _target_: src.training.scheduler.WarmupLR
       _partial_: true
       start_value: 0.0
-      warmup_steps: 10_000
+      warmup_steps: 30_000
 
   scheduling_metric: val/loss
 

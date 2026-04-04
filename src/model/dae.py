@@ -71,6 +71,10 @@ class DiscreteAutoencoder(BaseModel):
         recons = self.patch_decoder(z_q.unflatten(0, (B, H, W)).permute(0, 3, 1, 2))
         return recons, z_q, weights
 
+    def get_emb_idx(self, z):
+        weights, _ = self.latent(z, hard=True)
+        return weights.argmax(-1)
+
     def embed(self, inputs, hard=None, reshape='undo'):
         h = self.patch_encoder(inputs).permute(0, 2, 3, 1)
         weights = self.latent(h, hard=hard)[0]
@@ -79,10 +83,12 @@ class DiscreteAutoencoder(BaseModel):
         B, _, H, W = h.shape
         if reshape == 'undo':
             z_q = z_q.unflatten(0, (B, H, W)).permute(0, 3, 1, 2)
+            weights = weights.unflatten(0, (B, H, W))
         elif reshape == 'tokenization':
             z_q = z_q.unflatten(0, (B, H * W))
+            weights = weights.unflatten(0, (B, H, W))
 
-        return z_q
+        return z_q, weights.argmax(-1)
 
     def decode(self, z):
         B, _, H, W = z.shape
@@ -170,13 +176,17 @@ class VectorQuantizedAutoencoder(BaseModel):
     def embed(self, inputs, reshape='tokenization'):
         h = self.patch_encoder(inputs)
         z = self.latent_proj(h.permute(0, 2, 3, 1).flatten(0, 2))
-        z_q, _, _ = self.feature_codebook(z)
+        z_q, idx, _ = self.feature_codebook(z)
 
         B, _, H, W = h.shape
         if reshape == 'undo':
             z_q = z_q.unflatten(0, (B, H, W)).permute(0, 3, 1, 2)
+            idx = idx.unflatten(0, (B, H, W))
         elif reshape == 'tokenization':
             z_q = z_q.unflatten(0, (B, H * W))
+            idx = idx.unflatten(0, (B, H * W))
+
+        return z_q, idx
 
         return z_q
 

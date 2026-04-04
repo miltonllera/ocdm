@@ -22,10 +22,13 @@ class Quantization(nn.Module):
     def embedding_dim(self):
         return self.codebook.embedding_dim
 
-    def forward(self, z, pos=None):
-        idx = torch.vmap(lambda x, y: (x - y).abs().sum(-1), in_dims=(0, None)) (
+    def get_emb_idx(self, z):
+        return torch.vmap(lambda x, y: (x - y).abs().sum(-1), in_dims=(0, None)) (
             z, self.codebook.weight.detach()
         ).argmin(-1)
+
+    def forward(self, z, pos=None):
+        idx = self.get_emb_idx(z)
         z_q = self.codebook(idx)
 
         dist = dist_fn(z.detach(), z_q)

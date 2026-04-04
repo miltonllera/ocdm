@@ -39,7 +39,7 @@ class SlotDiffusion(BaseModel):
 
         backbone = SlotDiffusion._load_backbone(backbone_type, backbone_checkpoint)
         backbone.requires_grad_(False)
-        self.backbone = backbone
+        self.backbone = backbone.eval()
         self.backbone_type = backbone_type
 
         token_dim = backbone.hparams.token_dim  # type: ignore
@@ -62,7 +62,7 @@ class SlotDiffusion(BaseModel):
             d_model=token_dim,
             n_head=4,
             num_layers=num_layers,
-            ffwd_dim=ffwd_dim,
+            ffwd_dim=ffwd_dim if ffwd_dim is not None else token_dim * 4,
             dropout=dropout,
         )
 
@@ -134,15 +134,18 @@ class SlotDiffusion(BaseModel):
 
     def forward(self, inputs):
         with torch.no_grad():
-            tokens = self.backbone.embed(inputs, reshape='tokenization')
+            emb, _ = self.backbone.embed(inputs, reshape='tokenization')
 
-        slots, attn_weigts = self.slot(tokens)
-        slot_tokens = self.slot_proj(slots)
+        slot_input = self.pos_emb(emb.unflatten(1, self.resolution)).flatten(1, 2)
+        slots, attn_weigts = self.slot(slot_input)
+        slot_cond = self.slot_proj(slots)
 
-        noised_tokens, noise, t = self.apply_noise(tokens)
-        pred_noise = self.denoiser(noised_tokens, slot_tokens, t)
+        noised_tokens, noise, t = self.apply_noise(emb)
 
-        return (pred_noise, noise, t), (slots, attn_weigts), (tokens, noised_tokens)
+        noised_tokens = self.pos_emb(noised_tokens.unflatten(1, self.resolution)).flatten(1, 2)
+        pred_noise = self.denoiser(noised_tokens, slot_cond, t)
+
+        return (pred_noise, noise, t), (slots, attn_weigts), (emb, noised_tokens)
 
     def embed(self, inputs):
         tokens = self.backbone.embed(inputs)

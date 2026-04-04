@@ -8,14 +8,14 @@ import torch.nn.functional as F
 from src.model.base import BaseModel, TrainingInit
 from src.nn.init import linear_init
 from src.nn.slot import SlotAttention
-from src.nn.spatial import PositionEmbedding2D
+from src.nn.spatial import PositionEmbedding1D
 from src.nn.transformer import TransformerDecoder
 
 
 class SLATE(BaseModel):
     """
     SLATE with a pretrained frozen tokenizer backbone (DiscreteAutoencoder, VQ-VAE or VQ-GAN).
-    Trains only the slot attention + transformer decoder with MeanSquaredError on token embeddings.
+    Trains only the slot attention + transformer decoder modules with either MSE or CrossEntropy
     """
 
     def __init__(
@@ -34,20 +34,22 @@ class SLATE(BaseModel):
         ffwd_dim: int | None = None,
         dropout: float = 0.1,
         use_memory_mask: bool = False,
-        _ar_val_batches: int = 10,
+        autoregressive_loss: Literal['xent', 'mse'] = 'xent',
+        ar_val_batches: int = 10,
+
     ):
         super().__init__(training)
         self.save_hyperparameters()
 
         backbone = SLATE._load_backbone(backbone_type, backbone_checkpoint)
         backbone.requires_grad_(False)
-        self.backbone = backbone
+        self.backbone = backbone.eval()
         self.backbone_type = backbone_type
 
         token_dim = backbone.hparams.token_dim  # type: ignore
         H, W = self.resolution = tuple(backbone.hparams.resolution)  # type: ignore
 
-        self.pos_emb = PositionEmbedding2D(token_dim, H, W, 'cardinal')
+        self.pos_emb = PositionEmbedding1D(token_dim, H * W)
 
         self.slot = SlotAttention(
             input_size=token_dim,
@@ -73,7 +75,13 @@ class SLATE(BaseModel):
         self.bos_token = nn.Parameter(torch.empty(1, 1, token_dim))
 
         self.use_memory_mask = use_memory_mask
-        self._ar_val_batches = _ar_val_batches
+        self.ar_val_batches = ar_val_batches
+        self.ar_loss = autoregressive_loss
+
+        if autoregressive_loss == 'xent':
+            self.out_proj = nn.Linear(token_dim, backbone.hparams.vocab_size)  # type: ignore
+        else:
+            self.out_proj = nn.Identity()
 
         linear_init(self.slot_out_proj, activation=None)
         nn.init.normal_(self.bos_token)
@@ -102,40 +110,75 @@ class SLATE(BaseModel):
 
     def _nearest_token(self, pred_emb):
         B, S, _ = pred_emb.shape
-        if self.backbone_type == "discrete":
-            raise NotImplementedError()
+        pred_emb = pred_emb.flatten(0, 1)
+        if self.ar_loss == 'mse':
+            if self.backbone_type == "dae":
+                weights = self.backbone.latent(pred_emb, hard=True)  # type: ignore
+                z_q = weights.flatten(0, 2) @ self.backbone.feature_dict
+                idx = weights.argmax(-1)
+            else:
+                z_q, idx, _ = self.backbone.feature_codebook(pred_emb.flatten(0, 1))  # type: ignore
         else:
-            z_q, idx, _ = self.backbone.feature_codebook(pred_emb.flatten(0, -2))  # type: ignore
-            return idx.unflatten(0, (B, S)), z_q.unflatten(0, (B, S))
+            idx = pred_emb.argmax(-1)
+            if self.backbone_type == "dae":
+                z_q = self.backbone.feature_dict[idx]  # type: ignore
+            else:
+                z_q = self.backbone.feature_codebook.codebook(idx)  # type: ignore
+
+        return idx.unflatten(0, (B, S)), z_q.unflatten(0, (B, S))
 
     def forward(self, inputs):
         with torch.no_grad():
-            tokens = self.backbone.embed(inputs, reshape='tokenization')
+            patch_emb, idx = self.backbone.embed(inputs, reshape='tokenization')
 
-        tokens = torch.cat([self.bos_token.expand(len(inputs), -1, -1), tokens], dim=1)
-
-        slot_input = tokens[:, 1:]
-        tf_input = tokens[:, :-1]
-
-        slots, attn_weights = self.slot(slot_input)
+        patch_plus_pos = self.pos_emb(patch_emb)  # N, H * W, E_e
+        slots, attn_weights = self.slot(patch_plus_pos)  # N, S, E_s
         mask = attn_weights.detach() if self.use_memory_mask else None
-        slot_tokens = self.slot_out_proj(slots)
 
-        pred_embeddings = self.transformer_decoder(tf_input, slot_tokens, mask)
+        tf_input = torch.cat(  # N, H * W, E_e
+            [self.bos_token.expand(len(inputs), -1, -1), patch_plus_pos[:, :-1]],
+            dim=1
+        )
+        tf_mem = self.slot_out_proj(slots)  # N, S, E_e
+
+        # NOTE: we predict the true backbone embeddings WITHOUT position information or the index
+        # of the feature in the backbone's codebook if using cross_entropy as a loss. Thus the
+        # shape of pred_embeddings is either N, H * W, (E_e or C)
+        pred_embeddings = self.transformer_decoder(tf_input, tf_mem, mask)
+
+        tf_preds = self.out_proj(pred_embeddings)  # these are class logits if loss is xent
+        if self.ar_loss == 'xent':
+            tf_targets = idx  # index in the backbone codebook
+        else:
+            tf_targets = patch_emb.detach()  # raw backbone codebook weights
 
         with torch.no_grad():
             recons = self.backbone.decode(pred_embeddings)
 
-        return recons, (slots, attn_weights), (pred_embeddings, tokens[:, 1:])
+        return recons, (slots, attn_weights), (tf_preds, tf_targets)
+
+    def compute_ar_loss(self, pred_tokens, target_tokens):
+        B = len(pred_tokens)
+
+        pred_tokens = pred_tokens.flatten(0, 1)
+        target_tokens = target_tokens.flatten(0, 1)
+
+        if self.ar_loss == 'mse':
+            ar_loss = F.mse_loss(pred_tokens, target_tokens.detach(), reduction='sum') / B
+        else:
+            ar_loss = F.cross_entropy(pred_tokens, target_tokens, reduction='sum') / B
+
+        return ar_loss
 
     def _step(self, batch, batch_idx, phase):
         inputs, targets = batch
-        recons, slots, (pred_embeddings, target_embeddings) = self.forward(inputs)
-        emb_loss = F.mse_loss(pred_embeddings, target_embeddings.detach())
+        recons, slots, (pred_tokens, target_tokens) = self.forward(inputs)
+
+        ar_loss = self.compute_ar_loss(pred_tokens, target_tokens)
         recons_loss = F.mse_loss(recons, targets, reduction='sum') / len(targets)
 
         metrics = {
-            f"{phase}/loss": emb_loss,
+            f"{phase}/loss": ar_loss,
             f"{phase}/reconstruction_term": recons_loss,
         }
 
@@ -167,7 +210,7 @@ class SLATE(BaseModel):
     ):
         _, (slots, _), metrics = self._step(batch, batch_idx, phase)
 
-        if (phase == "test") or (phase == "val" and batch_idx < self._ar_val_batches):
+        if (phase == "test") or (phase == "val" and batch_idx < self.ar_val_batches):
             ar_recons, _ = self.autoregressive_recons(slots)
             ar_recons_loss = F.mse_loss(
                 ar_recons, batch[1], reduction='sum'
@@ -209,21 +252,18 @@ class SLATE(BaseModel):
             recons = self.backbone.decode(sampled)
             return recons, sampled
 
-    def sample_tokens(self, slots, use_codebook_emb=True):
+    def sample_tokens(self, slots):
         H, W = self.resolution
         slot_proj = self.slot_out_proj(slots)
 
         sampled = []
         token_inputs = self.bos_token.expand(len(slots), -1, -1)
 
-        for pos in product(range(H), range(W)):
+        for pos in range(H * W):
             pred_emb = self.transformer_decoder(token_inputs, slot_proj, None)[:, -1:]
-            if use_codebook_emb:
-                _, new_codebook_emb = self._nearest_token(pred_emb)
-            else:
-                new_codebook_emb = pred_emb
-            sampled.append(new_codebook_emb)
-            new_token = self.pos_emb(new_codebook_emb, pos=pos)
+            _, next_emb = self._nearest_token(self.out_proj(pred_emb))  # next_emb is already quantized
+            new_token = self.pos_emb(next_emb, start_pos=pos)
             token_inputs = torch.cat([token_inputs, new_token], dim=1)
+            sampled.append(new_token)
 
         return torch.cat(sampled, dim=1)

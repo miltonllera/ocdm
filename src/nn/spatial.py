@@ -41,16 +41,13 @@ class PositionConcat(nn.Module):
         return torch.cat([inputs, grid], dim=self.dim).contiguous()
 
     def __repr__(self):
-        return 'PositionConcat(height={},width={})'.format(self.height,
-                                                           self.width)
+        return 'PositionConcat(height={},width={})'.format(self.height, self.width)
 
 
 class PositionEmbedding1D(nn.Module):
-    def __init__(self, max_len, d_model):
+    def __init__(self, d_model, max_len):
         super().__init__()
-        self.pe = nn.Parameter(torch.zeros(1, max_len, d_model),
-                               requires_grad=True)
-
+        self.pe = nn.Parameter(torch.zeros(max_len, d_model), requires_grad=True)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -58,7 +55,7 @@ class PositionEmbedding1D(nn.Module):
 
     def forward(self, input, start_pos=0):
         T = input.shape[1]
-        return input + self.pe[:, start_pos:start_pos + T]
+        return input + self.pe[start_pos:start_pos + T]
 
 
 class PositionEmbedding2D(nn.Module):

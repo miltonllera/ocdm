@@ -47,7 +47,7 @@ class DiffusionDenoiser(nn.Module):
         d_model: int,
         n_head: int,
         num_layers: int,
-        ffwd_dim: int | None = 192,
+        ffwd_dim: int = 192,
         dropout: float = 0.0,
         neighborhood_radius: int = 1,
     ) -> None:
@@ -56,8 +56,6 @@ class DiffusionDenoiser(nn.Module):
 
         self.d_model = d_model
         self.spatial_size = spatial_size
-
-        self.pos_emb = PositionEmbedding2D(d_model, H, W, embed='cardinal')
 
         decoder_layer = nn.TransformerDecoderLayer(
             d_model, n_head, ffwd_dim, dropout,
@@ -88,10 +86,6 @@ class DiffusionDenoiser(nn.Module):
         memory: torch.Tensor,    # (batch, n_tokens, token_dim)
         t: torch.Tensor,        # (batch,) int
     ) -> torch.Tensor:          # (batch, H*W, d_model)
-        H, W = self.spatial_size
-
-        tgt = self.pos_emb(tokens.unflatten(1, (H, W))).flatten(1, 2)
-        tgt = tgt + sinusoidal_timestep_embedding(t, self.d_model).unsqueeze(1)
+        tgt = tokens + sinusoidal_timestep_embedding(t, self.d_model).unsqueeze(1)
         tgt = self.decoder(tgt, memory, tgt_mask=self.attn_mask, tgt_is_causal=False)
-
         return self.out_proj(tgt)

@@ -2,7 +2,7 @@
 
 # Basic settings
 condition_name: baseline_shapes3d
-model_name: bslate
+model_name: slate
 test: true
 
 dataset:
@@ -22,7 +22,7 @@ model:
   ffwd_dim: 192
   dropout: 0.1
   use_memory_mask: false
-  _ar_val_batches: 100
+  ar_val_batches: 100
 
   # Slot Attention
   n_slots: 5
