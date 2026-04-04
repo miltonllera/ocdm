@@ -196,12 +196,12 @@ class VectorQuantizedAutoencoder(BaseModel):
     def get_quantization(self, z, from_idx: bool):
         if from_idx:
             if len(z.shape) == 3:
-                z = z.argmax(-1)
-            features = self.feature_codebook.codebook(z.flatten(0, 1))
+                z_idx = z.argmax(-1)
+            features = self.feature_codebook.codebook(z_idx.flatten(0, 1))
         elif not from_idx:
-            features = self.feature_codebook(z.flatten(0, 1))
+            features, z_idx, _ = self.feature_codebook(z.flatten(0, 1))
 
-        return features, z
+        return features, z_idx
 
     def decode(self, z, from_idx: bool = True):
         B, S, H, W  = *z.shape[:2], *self.hparams.resolution  # type: ignore

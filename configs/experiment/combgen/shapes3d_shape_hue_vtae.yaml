@@ -16,7 +16,7 @@ model:
   backbone_type: vqgan  # one of: discrete, vqvae, vqgan
   backbone_checkpoint: ???  # path to pretrained autoencoder checkpoint
 
-  # Transformer Decoder
+  # Transformer Encoder/Decoder
   n_head: 4
   num_layers: 4
   ffwd_dim: 192

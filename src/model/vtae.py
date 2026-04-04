@@ -93,7 +93,7 @@ class VTAE(BaseModel):
 
     @staticmethod
     def _load_backbone(backbone_type, checkpoint_path):
-        from src.model.dae import (
+        from src.model.vqae import (
             DiscreteAutoencoder, VectorQuantizedAutoencoder, VectorQuantizedGAN
         )
         if backbone_type == "dae":
@@ -165,7 +165,7 @@ class VTAE(BaseModel):
         return z, params
 
     def embed(self, inputs):
-        tokens = self.backbone.embed(inputs)
+        tokens = self.backbone.embed(inputs)[0]
         return self.transformer_encoding(tokens, add_pos_emb=True)[0]
 
     def reconstruction(self, inputs):
@@ -177,20 +177,20 @@ class VTAE(BaseModel):
         z_proj = self.latent_proj(z).unsqueeze(1)
 
         sampled = []
-        token_inputs = self.latent_init.expand(len(z), -1, -1)
+        tf_inputs = self.latent_init.expand(len(z_proj), -1, -1)
 
         for pos in range(H * W):
-            pred_emb = self.transformer_decoder(token_inputs, z_proj, None)[:, -1:]
-            _, next_emb = self.nearest_token(self.out_proj(pred_emb))  # next_emb is already quantized
-            new_token = self.pos_emb(next_emb, start_pos=pos)
-            token_inputs = torch.cat([token_inputs, new_token], dim=1)
-            sampled.append(new_token)
+            token_pred = self.transformer_decoder(tf_inputs, z_proj, None)[:, -1:]
+            next_token, next_emb = self.nearest_token(self.out_proj(token_pred))
+            next_emb = self.pos_emb(next_emb, start_pos=pos)
+            tf_inputs = torch.cat([tf_inputs, next_emb], dim=1)
+            sampled.append(next_token)
 
         return torch.cat(sampled, dim=1)
 
-    def autoregressive_recons(self, slots):
+    def autoregressive_recons(self, latent):
         with torch.no_grad():
-            sampled = self.sample_tokens(slots).to(dtype=torch.float32)
+            sampled = self.sample_tokens(latent)
             recons = self.backbone.decode(sampled)
             return recons, sampled
 

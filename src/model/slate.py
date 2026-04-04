@@ -1,3 +1,4 @@
+from itertools import product
 from typing import Literal
 
 import torch
@@ -7,7 +8,7 @@ import torch.nn.functional as F
 from src.model.base import BaseModel, TrainingInit
 from src.nn.init import linear_init
 from src.nn.slot import SlotAttention
-from src.nn.spatial import PositionEmbedding1D
+from src.nn.spatial import PositionEmbedding1D, PositionEmbedding2D
 from src.nn.transformer import TransformerDecoder
 
 
@@ -48,7 +49,8 @@ class SLATE(BaseModel):
         token_dim = backbone.hparams.token_dim  # type: ignore
         H, W = self.resolution = tuple(backbone.hparams.resolution)  # type: ignore
 
-        self.pos_emb = PositionEmbedding1D(token_dim, H * W)
+        # self.pos_emb = PositionEmbedding1D(token_dim, H * W)
+        self.pos_emb = PositionEmbedding2D(token_dim, H, W, embed='cardinal')
 
         self.slot = SlotAttention(
             input_size=token_dim,
@@ -87,7 +89,7 @@ class SLATE(BaseModel):
 
     @staticmethod
     def _load_backbone(backbone_type, checkpoint_path):
-        from src.model.dae import (
+        from src.model.vqae import (
             DiscreteAutoencoder, VectorQuantizedAutoencoder, VectorQuantizedGAN
         )
         if backbone_type == "dae":
@@ -116,7 +118,8 @@ class SLATE(BaseModel):
         with torch.no_grad():
             patch_emb, idx = self.backbone.embed(inputs, reshape='tokenization')
 
-        patch_plus_pos = self.pos_emb(patch_emb)  # N, H * W, E_e
+        # N, H * W, E_e
+        patch_plus_pos = self.pos_emb(patch_emb.unflatten(1, self.resolution)).flatten(1, 2)
         slots, attn_weights = self.slot(patch_plus_pos)  # N, S, E_s
         mask = attn_weights.detach() if self.use_memory_mask else None
 
@@ -155,7 +158,7 @@ class SLATE(BaseModel):
         return ar_loss
 
     def embed(self, inputs):
-        tokens = self.backbone.embed(inputs)
+        tokens = self.backbone.embed(inputs)[0]
         return self.slot(tokens)[0]
 
     def reconstruction(self, inputs):
@@ -167,20 +170,21 @@ class SLATE(BaseModel):
         slot_proj = self.slot_out_proj(slots)
 
         sampled = []
-        token_inputs = self.bos_token.expand(len(slots), -1, -1)
+        tf_inputs = self.bos_token.expand(len(slots), -1, -1)
 
-        for pos in range(H * W):
-            pred_emb = self.transformer_decoder(token_inputs, slot_proj, None)[:, -1:]
-            _, next_emb = self.nearest_token(self.out_proj(pred_emb))  # next_emb is already quantized
-            new_token = self.pos_emb(next_emb, start_pos=pos)
-            token_inputs = torch.cat([token_inputs, new_token], dim=1)
-            sampled.append(new_token)
+        # for pos in range(H * W):
+        for pos in product(range(H), range(W)):
+            token_pred = self.transformer_decoder(tf_inputs, slot_proj, None)[:, -1:]
+            next_token, next_emb = self.nearest_token(self.out_proj(token_pred))
+            next_emb = self.pos_emb(next_emb, pos=pos)
+            tf_inputs = torch.cat([tf_inputs, next_emb], dim=1)
+            sampled.append(next_token)
 
         return torch.cat(sampled, dim=1)
 
     def autoregressive_recons(self, slots):
         with torch.no_grad():
-            sampled = self.sample_tokens(slots).to(dtype=torch.float32)
+            sampled = self.sample_tokens(slots)
             recons = self.backbone.decode(sampled)
             return recons, sampled
 

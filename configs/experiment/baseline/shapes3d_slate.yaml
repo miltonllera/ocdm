@@ -28,8 +28,8 @@ model:
   n_slots: 5
   slot_size: 64
   slot_n_iter: 3
-  slot_channels: 1
-  slot_hidden_size: 128
+  slot_channels: 4
+  slot_hidden_size: 192
   slot_approx_implicit_grad: false
 
 training:

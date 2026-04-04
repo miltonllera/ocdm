@@ -83,7 +83,7 @@ class SlotDiffusion(BaseModel):
 
     @staticmethod
     def _load_backbone(backbone_type, checkpoint_path):
-        from src.model.dae import (
+        from src.model.vqae import (
             DiscreteAutoencoder, VectorQuantizedAutoencoder, VectorQuantizedGAN
         )
         if backbone_type == "dae":
