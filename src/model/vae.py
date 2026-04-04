@@ -69,9 +69,9 @@ class VariationalAutoencoder(BaseModel):
 
     @abstractmethod
     def _compute_latent_loss(
-            self,
-            z: torch.Tensor,
-            z_params: tuple[torch.Tensor, torch.Tensor]
+        self,
+        z: torch.Tensor,
+        z_params: tuple[torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
         raise NotImplementedError
 

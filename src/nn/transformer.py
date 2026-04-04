@@ -4,6 +4,36 @@ import torch.nn as nn
 from .init import linear_init
 
 
+class TransformerEncoder(nn.TransformerEncoder):
+    def __init__(
+        self,
+        d_model: int=512,
+        n_head: int=4,
+        num_layers: int=4,
+        ffwd_dim: Optional[int] = None,
+        dropout: float=0.0,
+        mask: Optional[torch.Tensor] = None,
+    ):
+        if ffwd_dim is None:
+            ffwd_dim = 4 * d_model
+
+        layer_norm = nn.LayerNorm(d_model)
+        decoder_layer = nn.TransformerEncoderLayer(
+            d_model,
+            n_head,
+            ffwd_dim,
+            dropout,
+            batch_first=True,
+            norm_first=True
+        )
+
+        super().__init__(decoder_layer, num_layers, layer_norm)
+        init_projections(self, num_layers)
+
+    def forward(self, tgt):
+        return super().forward(tgt, is_causal=False)
+
+
 class TransformerDecoder(nn.TransformerDecoder):
     def __init__(
         self,

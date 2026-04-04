@@ -1,0 +1,63 @@
+# @package _global_
+
+# Basic settings
+condition_name: combgen_shapes3d
+model_name: vtae
+test: true
+
+dataset:
+  _target_: src.dataset.shapes3d.Shapes3D
+  path: data/datasets/shapes3d/3dshapes.h5
+  held_out_filter: "( shape == 3 ) & ( object_hue > 0.5 )"
+
+model:
+  _target_: src.model.vtae.VTAE
+
+  backbone_type: vqgan  # one of: discrete, vqvae, vqgan
+  backbone_checkpoint: ???  # path to pretrained autoencoder checkpoint
+
+  # Transformer Decoder
+  n_head: 4
+  num_layers: 4
+  ffwd_dim: 192
+  dropout: 0.1
+  use_memory_mask: false
+  ar_val_batches: 100
+
+  # WAE parameters
+  latent_size: 256
+  lambda1: 10.0
+  lambda2: 0.001
+  prior_type: norm
+  prior_var: 2.0
+
+training:
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: 0.0003
+
+  schedulers:
+    exponential:
+      _target_: src.training.scheduler.ExponentialLR
+      _partial_: true
+      gamma: 0.99999653  # 0.5 ** (1 / 200000)
+      decay_groups: null
+    warmup:
+      _target_: src.training.scheduler.WarmupLR
+      _partial_: true
+      start_value: 0.0
+      warmup_steps: 30_000
+
+  scheduling_metric: val/loss
+
+trainer:
+  _target_: lightning.pytorch.Trainer
+  max_steps: 100_000
+  gradient_clip_val: 1.0
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 10
+  val_check_interval: 10_000
+  check_val_every_n_epoch: null
+  fast_dev_run: false
+  default_root_dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
