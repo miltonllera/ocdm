@@ -187,7 +187,7 @@ class SlotDiffusion(BaseModel):
         inputs, targets = batch
         (noise, pred_noise, _), (slots, _), (tokens, _) = self.forward(inputs)
         denoised_tokens = self.denoise(slots)
-        recons = self.backbone.decode(denoised_tokens)
+        recons = self.backbone.decode(denoised_tokens, from_idx=False)
 
         loss = F.mse_loss(noise, pred_noise, reduction='sum') / len(targets)
         denoising_loss = F.mse_loss(denoised_tokens, tokens, reduction='sum') / len(targets)

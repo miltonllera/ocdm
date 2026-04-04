@@ -1,4 +1,3 @@
-from itertools import product
 from typing import Literal
 
 import torch
@@ -108,23 +107,9 @@ class SLATE(BaseModel):
     def dim(self):
         return self.backbone.hparams.token_dim  # type: ignore
 
-    def _nearest_token(self, pred_emb):
-        B, S, _ = pred_emb.shape
-        pred_emb = pred_emb.flatten(0, 1)
-        if self.ar_loss == 'mse':
-            if self.backbone_type == "dae":
-                weights = self.backbone.latent(pred_emb, hard=True)  # type: ignore
-                z_q = weights.flatten(0, 2) @ self.backbone.feature_dict
-                idx = weights.argmax(-1)
-            else:
-                z_q, idx, _ = self.backbone.feature_codebook(pred_emb.flatten(0, 1))  # type: ignore
-        else:
-            idx = pred_emb.argmax(-1)
-            if self.backbone_type == "dae":
-                z_q = self.backbone.feature_dict[idx]  # type: ignore
-            else:
-                z_q = self.backbone.feature_codebook.codebook(idx)  # type: ignore
-
+    def nearest_token(self, pred_emb):
+        B, S = pred_emb.shape[:2]
+        z_q, idx = self.backbone.get_quantization(pred_emb, from_idx=self.ar_loss == 'xent')
         return idx.unflatten(0, (B, S)), z_q.unflatten(0, (B, S))
 
     def forward(self, inputs):
@@ -144,16 +129,15 @@ class SLATE(BaseModel):
         # NOTE: we predict the true backbone embeddings WITHOUT position information or the index
         # of the feature in the backbone's codebook if using cross_entropy as a loss. Thus the
         # shape of pred_embeddings is either N, H * W, (E_e or C)
-        pred_embeddings = self.transformer_decoder(tf_input, tf_mem, mask)
+        tf_preds = self.out_proj(self.transformer_decoder(tf_input, tf_mem, mask))
 
-        tf_preds = self.out_proj(pred_embeddings)  # these are class logits if loss is xent
         if self.ar_loss == 'xent':
             tf_targets = idx  # index in the backbone codebook
         else:
             tf_targets = patch_emb.detach()  # raw backbone codebook weights
 
         with torch.no_grad():
-            recons = self.backbone.decode(pred_embeddings)
+            recons = self.backbone.decode(tf_preds, from_idx=self.ar_loss == 'xent')
 
         return recons, (slots, attn_weights), (tf_preds, tf_targets)
 
@@ -169,6 +153,36 @@ class SLATE(BaseModel):
             ar_loss = F.cross_entropy(pred_tokens, target_tokens, reduction='sum') / B
 
         return ar_loss
+
+    def embed(self, inputs):
+        tokens = self.backbone.embed(inputs)
+        return self.slot(tokens)[0]
+
+    def reconstruction(self, inputs):
+        slots = self.embed(inputs)
+        return self.autoregressive_recons(slots)[0]
+
+    def sample_tokens(self, slots):
+        H, W = self.resolution
+        slot_proj = self.slot_out_proj(slots)
+
+        sampled = []
+        token_inputs = self.bos_token.expand(len(slots), -1, -1)
+
+        for pos in range(H * W):
+            pred_emb = self.transformer_decoder(token_inputs, slot_proj, None)[:, -1:]
+            _, next_emb = self.nearest_token(self.out_proj(pred_emb))  # next_emb is already quantized
+            new_token = self.pos_emb(next_emb, start_pos=pos)
+            token_inputs = torch.cat([token_inputs, new_token], dim=1)
+            sampled.append(new_token)
+
+        return torch.cat(sampled, dim=1)
+
+    def autoregressive_recons(self, slots):
+        with torch.no_grad():
+            sampled = self.sample_tokens(slots).to(dtype=torch.float32)
+            recons = self.backbone.decode(sampled)
+            return recons, sampled
 
     def _step(self, batch, batch_idx, phase):
         inputs, targets = batch
@@ -234,36 +248,3 @@ class SLATE(BaseModel):
         batch_idx: int,
     ):
         return self.validation_step(batch, batch_idx, "test")
-
-    def predict(self, inputs: torch.Tensor) -> torch.Tensor:
-        return self.embed(inputs)
-
-    def reconstruction(self, inputs):
-        slots = self.embed(inputs)
-        return self.autoregressive_recons(slots)[0]
-
-    def embed(self, inputs):
-        tokens = self.backbone.embed(inputs)
-        return self.slot(tokens)[0]
-
-    def autoregressive_recons(self, slots):
-        with torch.no_grad():
-            sampled = self.sample_tokens(slots).to(dtype=torch.float32)
-            recons = self.backbone.decode(sampled)
-            return recons, sampled
-
-    def sample_tokens(self, slots):
-        H, W = self.resolution
-        slot_proj = self.slot_out_proj(slots)
-
-        sampled = []
-        token_inputs = self.bos_token.expand(len(slots), -1, -1)
-
-        for pos in range(H * W):
-            pred_emb = self.transformer_decoder(token_inputs, slot_proj, None)[:, -1:]
-            _, next_emb = self._nearest_token(self.out_proj(pred_emb))  # next_emb is already quantized
-            new_token = self.pos_emb(next_emb, start_pos=pos)
-            token_inputs = torch.cat([token_inputs, new_token], dim=1)
-            sampled.append(new_token)
-
-        return torch.cat(sampled, dim=1)

@@ -54,7 +54,6 @@ class DiscreteAutoencoder(BaseModel):
 
         decoder_input_size = token_dim, H, W
         self.patch_decoder = create_sequential(decoder_input_size, decoder_config)
-
         self.recons_loss = ReconstructionLoss()
         self.reset_parameters()
 
@@ -90,9 +89,15 @@ class DiscreteAutoencoder(BaseModel):
 
         return z_q, weights.argmax(-1)
 
-    def decode(self, z):
-        B, _, H, W = z.shape
-        features = z.flatten(2) @ self.feature_dict
+    def get_quantization(self, z, from_idx):
+        if len(z.shape) == 3:
+            z = z.argmax(-1)
+        return self.feature_dict[z.flatten(0, 1)], z
+
+    def decode(self, z, from_idx: bool = True):
+        B, S, H, W  = *z.shape[:2], *self.hparams.resolution  # type: ignore
+        assert S == H * W
+        features = self.get_quantization(z, from_idx)[0]
         return self.patch_decoder(features.unflatten(0, (B, H, W)).permute(0, 3, 1, 2))
 
     def _step(
@@ -188,18 +193,21 @@ class VectorQuantizedAutoencoder(BaseModel):
 
         return z_q, idx
 
-        return z_q
+    def get_quantization(self, z, from_idx: bool):
+        if from_idx:
+            if len(z.shape) == 3:
+                z = z.argmax(-1)
+            features = self.feature_codebook.codebook(z.flatten(0, 1))
+        elif not from_idx:
+            features = self.feature_codebook(z.flatten(0, 1))
 
-    def decode(self, emb):
-        _, S = emb.shape[:2]
-        assert S == self.resolution[0] * self.resolution[1]
-        if emb.dtype == torch.long:
-            z_q = self.feature_codebook.codebook(emb.flatten(0, 1))
-        else:
-            z_q = self.feature_codebook(emb.flatten(0, 1))[0]
+        return features, z
 
-        z_q = z_q.unflatten(0, (len(emb), *self.resolution)).permute(0, 3, 1, 2)
-        return self.patch_decoder(z_q)
+    def decode(self, z, from_idx: bool = True):
+        B, S, H, W  = *z.shape[:2], *self.hparams.resolution  # type: ignore
+        assert S == H * W
+        features = self.get_quantization(z, from_idx)[0]
+        return self.patch_decoder(features.unflatten(0, (B, H, W)).permute(0, 3, 1, 2))
 
     def reconstruction(self, inputs: torch.Tensor):
         return self.forward(inputs)[0]

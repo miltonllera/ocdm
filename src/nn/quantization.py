@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 
 
-dist_fn = lambda x, y: torch.sum((x - y) ** 2, dim=-1)
+l1_dist = lambda x, y: torch.abs(x - y).sum(-1)
+l2_dist = lambda x, y: torch.square(x - y).sum(-1)
 
 
 class Quantization(nn.Module):
@@ -23,17 +24,17 @@ class Quantization(nn.Module):
         return self.codebook.embedding_dim
 
     def get_emb_idx(self, z):
-        return torch.vmap(lambda x, y: (x - y).abs().sum(-1), in_dims=(0, None)) (
-            z, self.codebook.weight.detach()
-        ).argmin(-1)
+        with torch.no_grad():
+            dist = torch.vmap(l1_dist, in_dims=(0, None)) (z, self.codebook.weight)
+            return dist.argmin(-1)
 
     def forward(self, z, pos=None):
         idx = self.get_emb_idx(z)
         z_q = self.codebook(idx)
 
-        dist = dist_fn(z.detach(), z_q)
+        dist = l2_dist(z.detach(), z_q)
         if self.training:
-            dist = 0.5 * (dist + self.beta * dist_fn(z, z_q.detach()))  # commitment loss
+            dist = 0.5 * (dist + self.beta * l2_dist(z, z_q.detach()))  # commitment loss
             z_q = z + (z_q - z).detach()  # straight-through estimation
         return z_q, idx, dist
 
@@ -75,9 +76,9 @@ class ResidualQuantization(nn.Module):
             residual = residual - rq
             idxs.append(idx)
 
-        dist = dist_fn(z.detach(), zq)
+        dist = l2_dist(z.detach(), zq)
         if self.training:
-            dist = 0.5 * (dist + self.beta * dist_fn(z, zq.detach()))  # commitment loss
+            dist = 0.5 * (dist + self.beta * l2_dist(z, zq.detach()))  # commitment loss
             zq = z + (zq - z).detach()  # straight-through estimation
 
         return zq, torch.stack(idxs, dim=-1), dist
@@ -127,10 +128,10 @@ class CombinatorialQuantization(nn.Module):
 
         z_q = torch.cat(z_q, dim=-1)
         idxs = torch.stack(idxs, dim=-1)
-        dist = dist_fn(z.detach(), z_q)
+        dist = l2_dist(z.detach(), z_q)
 
         if self.training:
-            dist = 0.5 * (dist + self.beta * dist_fn(z, z_q.detach()))  # commitment loss
+            dist = 0.5 * (dist + self.beta * l2_dist(z, z_q.detach()))  # commitment loss
             z_q = z + (z_q - z).detach()  # straight-through estimation
 
         return z_q, idxs, dist
