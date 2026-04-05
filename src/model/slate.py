@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from src.model.base import BaseModel, TrainingInit
 from src.nn.init import linear_init
 from src.nn.slot import SlotAttention
-from src.nn.spatial import PositionEmbedding1D, PositionEmbedding2D
+from src.nn.spatial import PositionEmbedding2D
 from src.nn.transformer import TransformerDecoder
 
 
@@ -111,11 +111,11 @@ class SLATE(BaseModel):
 
     def forward(self, inputs):
         with torch.no_grad():
-            patch_emb, idx = self.backbone.embed(inputs, reshape='tokenization')
+            patches, idx = self.backbone.embed(inputs, reshape='tokenization')
 
         # N, H * W, E_e
         # patch_plus_pos = self.pos_emb(patch_emb)  # N, H * W, E_e
-        patch_plus_pos = self.pos_emb(patch_emb.unflatten(1, self.resolution)).flatten(1, 2)
+        patch_plus_pos = self.pos_emb(patches.unflatten(1, self.resolution)).flatten(1, 2)
 
         slots, attn_weights = self.slot(patch_plus_pos)  # N, S, E_s
         mask = attn_weights.detach() if self.use_memory_mask else None
@@ -134,7 +134,7 @@ class SLATE(BaseModel):
         if self.ar_loss == 'xent':
             tf_targets = idx  # index in the backbone's codebook
         else:
-            tf_targets = patch_emb.detach()  # raw backbone codebook weight
+            tf_targets = patches.detach()  # raw backbone codebook weight
 
         with torch.no_grad():
             recons = self.backbone.decode(tf_preds, from_idx=self.ar_loss == 'xent')
@@ -155,9 +155,9 @@ class SLATE(BaseModel):
         return ar_loss
 
     def embed(self, inputs):
-        patch_emb = self.backbone.embed(inputs)[0]
-        patch_emb = self.pos_emb(patch_emb.unflatten(1, self.resolution)).flatten(1, 2)
-        return self.slot(patch_emb)[0]
+        patches = self.backbone.embed(inputs)[0]
+        patches = self.pos_emb(patches.unflatten(1, self.resolution)).flatten(1, 2)
+        return self.slot(patches)[0]
 
     def reconstruction(self, inputs):
         slots = self.embed(inputs)
@@ -189,14 +189,29 @@ class SLATE(BaseModel):
 
     def _step(self, batch, batch_idx, phase):
         inputs, targets = batch
-        recons, slots, (pred_tokens, target_tokens) = self.forward(inputs)
+        recons, (slots, attn), (pred_tokens, target_tokens) = self.forward(inputs)
 
         ar_loss = self.compute_ar_loss(pred_tokens, target_tokens)
         recons_loss = F.mse_loss(recons, targets, reduction='sum') / len(targets)
 
-        metrics = {f"{phase}/loss": ar_loss, f"{phase}/reconstruction_term": recons_loss}
+        # treat slot assignment for each patch as prob
+        # attn_log_probs = F.softmax(attn, dim=2)
+        # # compute entropy for each patch
+        # patch_attn_entropy = -(attn_log_probs * torch.log(attn_log_probs + 1e-8)).sum(dim=2)
+        # attn_entropy_loss = patch_attn_entropy.sum() / len(inputs)
 
-        return recons, slots, metrics
+        # loss = ar_loss + attn_entropy_loss
+
+        loss = ar_loss
+
+        metrics = {
+            f"{phase}/loss": loss,
+            f"{phase}/ar_loss": ar_loss,
+            # f"{phase}/attn_entropy_loss": attn_entropy_loss,
+            f"{phase}/reconstruction_term": recons_loss
+        }
+
+        return recons, (slots, attn), metrics
 
     def training_step(
         self,

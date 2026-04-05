@@ -9,11 +9,15 @@ from src.model.base import BaseModel, TrainingInit
 from src.nn.init import linear_init
 from src.nn.stochastic import DiagonalGaussian
 from src.training.loss import WassersteinMMD
-from src.nn.spatial import PositionEmbedding1D, PositionEmbedding2D
+from src.nn.spatial import PositionEmbedding2D
 from src.nn.transformer import TransformerEncoder, TransformerDecoder
 
 
 class VTAE(BaseModel):
+    """
+    Use a ViT to encode image patches into a single token, which is then use to reconstruct the
+    corresponding patch tokens using a Transformer. Analogous to SLATE without segmentation.
+    """
     def __init__(
         self,
         backbone_type: Literal["dae", "vqvae", "vqgan"],
@@ -122,7 +126,7 @@ class VTAE(BaseModel):
         # patch_plus_pos = self.pos_emb(patch_emb)  # N, H * W, E_e
         patch_plus_pos = self.pos_emb(patch_emb.unflatten(1, self.resolution)).flatten(1, 2)
 
-        z, params = self.transformer_encoding(patch_plus_pos, add_pos_emb=False)
+        z, params = self.transformer_encoding(patch_plus_pos)
         z_proj = self.latent_proj(z).unsqueeze(1)
 
         # NOTE: we predict the true backbone embeddings WITHOUT position information or the index
@@ -155,17 +159,16 @@ class VTAE(BaseModel):
 
         return ar_loss
 
-    def transformer_encoding(self, inputs, add_pos_emb=False):
-        if add_pos_emb:
-            inputs = self.pos_emb(inputs.unflatten(1, self.resolution)).flatten(1, 2)
-        tfe_input = torch.cat([self.latent_init.expand(len(inputs), -1, -1), inputs], dim=1)
+    def transformer_encoding(self, patches):
+        tfe_input = torch.cat([self.latent_init.expand(len(patches), -1, -1), patches], dim=1)
         h = self.transformer_encoder(tfe_input)[:, 0]
         z, params = self.latent(h)
         return z, params
 
     def embed(self, inputs):
-        tokens = self.backbone.embed(inputs)[0]
-        return self.transformer_encoding(tokens, add_pos_emb=True)[0]
+        patches = self.backbone.embed(inputs)[0]
+        patches = self.pos_emb(patches.unflatten(1, self.resolution)).flatten(1, 2)
+        return self.transformer_encoding(patches)[0]
 
     def reconstruction(self, inputs):
         z = self.embed(inputs)

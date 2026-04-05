@@ -21,7 +21,7 @@ model:
   n_head: 4
   num_layers: 4
   ffwd_dim: 192
-  dropout: 0.2
+  dropout: 0.1
   use_memory_mask: false
   ar_val_batches: 100
 
@@ -53,7 +53,7 @@ training:
 
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_steps: 100_000
+  max_steps: 400_000
   gradient_clip_val: 1.0
   accelerator: auto
   devices: auto

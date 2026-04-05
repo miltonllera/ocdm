@@ -26,7 +26,7 @@ model:
   ar_val_batches: 100
 
   # Slot Attention
-  n_slots: 3
+  n_slots: 4
   slot_size: 64
   slot_n_iter: 3
   slot_channels: 1
