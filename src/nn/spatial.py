@@ -82,9 +82,9 @@ class PositionEmbedding2D(nn.Module):
         self.grid = grid.transpose(2, 0)
         self.projection = linear
 
-    def forward(self, inputs: torch.Tensor, start_pos=None) -> torch.Tensor:
+    def forward(self, inputs: torch.Tensor, pos=None) -> torch.Tensor:
         proj = self.projection(self.grid.to(device=inputs.device))
-        if start_pos is not None:
+        if pos is not None:
             proj = proj[*pos]
         return inputs + proj
 

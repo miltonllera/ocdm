@@ -168,15 +168,10 @@ class VectorQuantizedAutoencoder(BaseModel):
     def forward(self, inputs):
         h = self.patch_encoder(inputs)
         B, _, H, W = h.shape
-
         z = self.latent_proj(h.permute(0, 2, 3, 1).flatten(0, 2))
         z_q, idx, dist = self.feature_codebook(z)
-        z_q = z_q.unflatten(0, (B, H, W)).permute(0, 3, 1, 2)
-        idx = idx.unflatten(0, (B, H, W))
-        dist = dist.unflatten(0, (B, H, W))
-
-        recons = self.patch_decoder(z_q)
-        return recons, idx, dist
+        recons = self.patch_decoder(z_q.unflatten(0, (B, H, W)).permute(0, 3, 1, 2))
+        return recons, idx.unflatten(0, (B, H, W)), dist.unflatten(0, (B, H, W))
 
     def embed(self, inputs, reshape='tokenization'):
         h = self.patch_encoder(inputs)
@@ -195,19 +190,19 @@ class VectorQuantizedAutoencoder(BaseModel):
 
     def get_quantization(self, z, from_idx: bool):
         if from_idx:
-            if len(z.shape) == 3:
-                z_idx = z.argmax(-1)
-            features = self.feature_codebook.codebook(z_idx.flatten(0, 1))
-        elif not from_idx:
+            # assume onehot or logits if 3 dimensional matrix
+            z_idx = z.argmax(-1) if len(z.shape) == 3 else z
+            features = self.feature_codebook.codebook(z_idx)
+        else:
+            B, S = z.shape[:2]
             features, z_idx, _ = self.feature_codebook(z.flatten(0, 1))
+            features, z_idx = features.unflatten(0, (B, S)), z_idx.unflatten(0, (B, S))
 
         return features, z_idx
 
     def decode(self, z, from_idx: bool = True):
-        B, S, H, W  = *z.shape[:2], *self.hparams.resolution  # type: ignore
-        assert S == H * W
         features = self.get_quantization(z, from_idx)[0]
-        return self.patch_decoder(features.unflatten(0, (B, H, W)).permute(0, 3, 1, 2))
+        return self.patch_decoder(features.permute(0, 2, 1).unflatten(2, self.hparams.resolution))
 
     def reconstruction(self, inputs: torch.Tensor):
         return self.forward(inputs)[0]

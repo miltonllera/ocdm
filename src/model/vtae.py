@@ -1,3 +1,4 @@
+from itertools import product
 from typing import Callable, Literal
 
 import torch
@@ -8,7 +9,7 @@ from src.model.base import BaseModel, TrainingInit
 from src.nn.init import linear_init
 from src.nn.stochastic import DiagonalGaussian
 from src.training.loss import WassersteinMMD
-from src.nn.spatial import PositionEmbedding1D
+from src.nn.spatial import PositionEmbedding1D, PositionEmbedding2D
 from src.nn.transformer import TransformerEncoder, TransformerDecoder
 
 
@@ -47,7 +48,8 @@ class VTAE(BaseModel):
         token_dim = backbone.hparams.token_dim  # type: ignore
         H, W = self.resolution = tuple(backbone.hparams.resolution)  # type: ignore
 
-        self.pos_emb = PositionEmbedding1D(token_dim, H * W)
+        # self.pos_emb = PositionEmbedding1D(token_dim, H * W)
+        self.pos_emb = PositionEmbedding2D(token_dim, H, W, embed='cardinal')
 
         self.latent = DiagonalGaussian(token_dim, latent_size)
         self.latent_init = nn.Parameter(torch.empty(1, 1, token_dim))
@@ -113,24 +115,21 @@ class VTAE(BaseModel):
     def dim(self):
         return self.backbone.hparams.token_dim  # type: ignore
 
-    def nearest_token(self, pred_emb):
-        B, S = pred_emb.shape[:2]
-        z_q, idx = self.backbone.get_quantization(pred_emb, from_idx=self.ar_loss == 'xent')
-        return idx.unflatten(0, (B, S)), z_q.unflatten(0, (B, S))
-
     def forward(self, inputs):
         with torch.no_grad():
             patch_emb, idx = self.backbone.embed(inputs, reshape='tokenization')
-        patch_plus_pos = self.pos_emb(patch_emb)  # N, H * W, E_e
+
+        # patch_plus_pos = self.pos_emb(patch_emb)  # N, H * W, E_e
+        patch_plus_pos = self.pos_emb(patch_emb.unflatten(1, self.resolution)).flatten(1, 2)
 
         z, params = self.transformer_encoding(patch_plus_pos, add_pos_emb=False)
         z_proj = self.latent_proj(z).unsqueeze(1)
-        bos_token = self.latent_init.expand(len(inputs), -1, -1)
-        tfd_input = torch.cat([bos_token, patch_plus_pos[:, :-1]], dim=1)
 
         # NOTE: we predict the true backbone embeddings WITHOUT position information or the index
         # of the feature in the backbone's codebook if using cross_entropy as a loss. Thus the
         # shape of pred_embeddings is either N, H * W, (E_e or C)
+        bos_token = self.latent_init.expand(len(inputs), -1, -1)
+        tfd_input = torch.cat([bos_token, patch_plus_pos[:, :-1]], dim=1)
         tf_preds = self.out_proj(self.transformer_decoder(tfd_input, z_proj))
 
         if self.ar_loss == 'xent':
@@ -174,16 +173,18 @@ class VTAE(BaseModel):
 
     def sample_tokens(self, z):
         H, W = self.resolution
-        z_proj = self.latent_proj(z).unsqueeze(1)
+
+        tf_inputs = self.latent_init.expand(len(z), -1, -1)
+        tf_mem = self.latent_proj(z).unsqueeze(1)
 
         sampled = []
-        tf_inputs = self.latent_init.expand(len(z_proj), -1, -1)
-
-        for pos in range(H * W):
-            token_pred = self.transformer_decoder(tf_inputs, z_proj, None)[:, -1:]
-            next_token, next_emb = self.nearest_token(self.out_proj(token_pred))
-            next_emb = self.pos_emb(next_emb, start_pos=pos)
-            tf_inputs = torch.cat([tf_inputs, next_emb], dim=1)
+        for pos in product(range(H), range(W)):
+            token_pred = self.transformer_decoder(tf_inputs, tf_mem, None)[:, -1:]
+            # (B, 1, 1) and (B, 1, E)
+            next_emb, next_token = self.backbone.get_quantization(
+                self.out_proj(token_pred), from_idx=self.ar_loss == 'xent',
+            )
+            tf_inputs = torch.cat([tf_inputs, self.pos_emb(next_emb, pos=pos)], dim=1)
             sampled.append(next_token)
 
         return torch.cat(sampled, dim=1)

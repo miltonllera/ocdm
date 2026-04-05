@@ -109,17 +109,14 @@ class SLATE(BaseModel):
     def dim(self):
         return self.backbone.hparams.token_dim  # type: ignore
 
-    def nearest_token(self, pred_emb):
-        B, S = pred_emb.shape[:2]
-        z_q, idx = self.backbone.get_quantization(pred_emb, from_idx=self.ar_loss == 'xent')
-        return idx.unflatten(0, (B, S)), z_q.unflatten(0, (B, S))
-
     def forward(self, inputs):
         with torch.no_grad():
             patch_emb, idx = self.backbone.embed(inputs, reshape='tokenization')
 
         # N, H * W, E_e
+        # patch_plus_pos = self.pos_emb(patch_emb)  # N, H * W, E_e
         patch_plus_pos = self.pos_emb(patch_emb.unflatten(1, self.resolution)).flatten(1, 2)
+
         slots, attn_weights = self.slot(patch_plus_pos)  # N, S, E_s
         mask = attn_weights.detach() if self.use_memory_mask else None
 
@@ -129,15 +126,15 @@ class SLATE(BaseModel):
         )
         tf_mem = self.slot_out_proj(slots)  # N, S, E_e
 
-        # NOTE: we predict the true backbone embeddings WITHOUT position information or the index
-        # of the feature in the backbone's codebook if using cross_entropy as a loss. Thus the
-        # shape of pred_embeddings is either N, H * W, (E_e or C)
+        # NOTE: we predict the true backbone embeddings WITHOUT position information if using MSE,
+        # or the index logits of the feature in the backbone's codebook if using cross_entropy.
+        # Thus the shape of pred_embeddings is either N, H * W, (E_e or C)
         tf_preds = self.out_proj(self.transformer_decoder(tf_input, tf_mem, mask))
 
         if self.ar_loss == 'xent':
-            tf_targets = idx  # index in the backbone codebook
+            tf_targets = idx  # index in the backbone's codebook
         else:
-            tf_targets = patch_emb.detach()  # raw backbone codebook weights
+            tf_targets = patch_emb.detach()  # raw backbone codebook weight
 
         with torch.no_grad():
             recons = self.backbone.decode(tf_preds, from_idx=self.ar_loss == 'xent')
@@ -167,17 +164,18 @@ class SLATE(BaseModel):
 
     def sample_tokens(self, slots):
         H, W = self.resolution
-        slot_proj = self.slot_out_proj(slots)
 
-        sampled = []
+        tf_mem = self.slot_out_proj(slots)
         tf_inputs = self.bos_token.expand(len(slots), -1, -1)
 
-        # for pos in range(H * W):
+        sampled = []
         for pos in product(range(H), range(W)):
-            token_pred = self.transformer_decoder(tf_inputs, slot_proj, None)[:, -1:]
-            next_token, next_emb = self.nearest_token(self.out_proj(token_pred))
-            next_emb = self.pos_emb(next_emb, pos=pos)
-            tf_inputs = torch.cat([tf_inputs, next_emb], dim=1)
+            token_pred = self.transformer_decoder(tf_inputs, tf_mem, None)[:, -1:]
+            # (B, 1) and (B, 1, E), with types torch.long and torch.float
+            next_emb, next_token = self.backbone.get_quantization(
+                self.out_proj(token_pred), from_idx=self.ar_loss == 'xent',
+            )
+            tf_inputs = torch.cat([tf_inputs, self.pos_emb(next_emb, pos=pos)], dim=1)
             sampled.append(next_token)
 
         return torch.cat(sampled, dim=1)
@@ -185,7 +183,7 @@ class SLATE(BaseModel):
     def autoregressive_recons(self, slots):
         with torch.no_grad():
             sampled = self.sample_tokens(slots)
-            recons = self.backbone.decode(sampled)
+            recons = self.backbone.decode(sampled, from_idx=True)
             return recons, sampled
 
     def _step(self, batch, batch_idx, phase):

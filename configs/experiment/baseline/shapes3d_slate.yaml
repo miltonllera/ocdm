@@ -8,6 +8,7 @@ test: true
 dataset:
   _target_: src.dataset.shapes3d.Shapes3D
   path: data/datasets/shapes3d/3dshapes.h5
+  batch_size: 128
   held_out_filter: null
 
 model:
@@ -20,7 +21,7 @@ model:
   n_head: 4
   num_layers: 4
   ffwd_dim: 192
-  dropout: 0.1
+  dropout: 0.2
   use_memory_mask: false
   ar_val_batches: 100
 

@@ -157,7 +157,7 @@ class SlotDiffusion(BaseModel):
         slots, _ = self.slot(tokens)
         slot_tokens = self.slot_proj(slots)
         denoised = self.denoise(slot_tokens)
-        return self.backbone.decode(denoised)
+        return self.backbone.decode(denoised, from_idx=False)
 
     def _step(self, batch):
         return self.forward(batch)
