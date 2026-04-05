@@ -157,7 +157,7 @@ class VTAE(BaseModel):
 
     def transformer_encoding(self, inputs, add_pos_emb=False):
         if add_pos_emb:
-            inputs = self.pos_emb(inputs)  # N, H * W, E_e
+            inputs = self.pos_emb(inputs.unflatten(1, self.resolution)).flatten(1, 2)
         tfe_input = torch.cat([self.latent_init.expand(len(inputs), -1, -1), inputs], dim=1)
         h = self.transformer_encoder(tfe_input)[:, 0]
         z, params = self.latent(h)

@@ -155,8 +155,9 @@ class SLATE(BaseModel):
         return ar_loss
 
     def embed(self, inputs):
-        tokens = self.backbone.embed(inputs)[0]
-        return self.slot(tokens)[0]
+        patch_emb = self.backbone.embed(inputs)[0]
+        patch_emb = self.pos_emb(patch_emb.unflatten(1, self.resolution)).flatten(1, 2)
+        return self.slot(patch_emb)[0]
 
     def reconstruction(self, inputs):
         slots = self.embed(inputs)
@@ -193,10 +194,7 @@ class SLATE(BaseModel):
         ar_loss = self.compute_ar_loss(pred_tokens, target_tokens)
         recons_loss = F.mse_loss(recons, targets, reduction='sum') / len(targets)
 
-        metrics = {
-            f"{phase}/loss": ar_loss,
-            f"{phase}/reconstruction_term": recons_loss,
-        }
+        metrics = {f"{phase}/loss": ar_loss, f"{phase}/reconstruction_term": recons_loss}
 
         return recons, slots, metrics
 

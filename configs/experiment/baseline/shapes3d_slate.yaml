@@ -8,8 +8,8 @@ test: true
 dataset:
   _target_: src.dataset.shapes3d.Shapes3D
   path: data/datasets/shapes3d/3dshapes.h5
-  batch_size: 128
   held_out_filter: null
+  batch_size: 128
 
 model:
   _target_: src.model.slate.SLATE
@@ -26,10 +26,10 @@ model:
   ar_val_batches: 100
 
   # Slot Attention
-  n_slots: 5
+  n_slots: 3
   slot_size: 64
   slot_n_iter: 3
-  slot_channels: 4
+  slot_channels: 1
   slot_hidden_size: 192
   slot_approx_implicit_grad: false
 
@@ -50,7 +50,7 @@ training:
       start_value: 0.0
       warmup_steps: 30_000
 
-  scheduling_metric: val/loss
+  scheduling_metric: val/ar_sample_loss
 
 trainer:
   _target_: lightning.pytorch.Trainer

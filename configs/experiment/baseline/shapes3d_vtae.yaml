@@ -9,6 +9,7 @@ dataset:
   _target_: src.dataset.shapes3d.Shapes3D
   path: data/datasets/shapes3d/3dshapes.h5
   held_out_filter: null
+  batch_size: 128
 
 model:
   _target_: src.model.vtae.VTAE
@@ -20,7 +21,7 @@ model:
   n_head: 4
   num_layers: 4
   ffwd_dim: 192
-  dropout: 0.1
+  dropout: 0.2
   use_memory_mask: false
   ar_val_batches: 100
 
@@ -48,7 +49,7 @@ training:
       start_value: 0.0
       warmup_steps: 30_000
 
-  scheduling_metric: val/loss
+  scheduling_metric: val/ar_sample_loss
 
 trainer:
   _target_: lightning.pytorch.Trainer
