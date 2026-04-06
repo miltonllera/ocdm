@@ -121,10 +121,10 @@ class VTAE(BaseModel):
 
     def forward(self, inputs):
         with torch.no_grad():
-            patch_emb, idx = self.backbone.embed(inputs, reshape='tokenization')
+            patches, idx = self.backbone.embed(inputs, reshape='tokenization')
 
         # patch_plus_pos = self.pos_emb(patch_emb)  # N, H * W, E_e
-        patch_plus_pos = self.pos_emb(patch_emb.unflatten(1, self.resolution)).flatten(1, 2)
+        patch_plus_pos = self.pos_emb(patches.unflatten(1, self.resolution)).flatten(1, 2)
 
         z, params = self.transformer_encoding(patch_plus_pos)
         z_proj = self.latent_proj(z).unsqueeze(1)
@@ -139,7 +139,7 @@ class VTAE(BaseModel):
         if self.ar_loss == 'xent':
             tf_targets = idx  # index in the backbone codebook
         else:
-            tf_targets = patch_emb.detach()  # raw backbone codebook weights
+            tf_targets = patches.detach()  # raw backbone codebook weights
 
         with torch.no_grad():
             recons = self.backbone.decode(tf_preds, from_idx=self.ar_loss == 'xent')
