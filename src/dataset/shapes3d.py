@@ -20,8 +20,14 @@ from typing import Callable, Literal
 import numpy as np
 import h5py
 import torchvision.transforms as trans
-from skimage.color import rgb2hsv
+from skimage.color import rgb2hsv, rgb2gray
+from skimage.feature import canny
 from torch.utils.data import Dataset
+
+
+def add_edges(x):
+    edges = canny(rgb2gray(x), sigma=3)
+    return np.concatenate([x, edges], axis=-1)
 
 
 class Shapes3D(Dataset):
@@ -82,7 +88,7 @@ class Shapes3D(Dataset):
         self.images, self.factor_values, self.factor_classes = self.load_raw(path, data_filter)
 
         # image_transforms = [trans.ToTensor(), trans.Resize((124, 124)), trans.RandomCrop(64)]
-        image_transforms = [trans.ToTensor()]
+        image_transforms = [trans.Lambda(add_edges), trans.ToTensor()]
         if color_format == 'hsv':
             image_transforms = [trans.Lambda(rgb2hsv)] + image_transforms
         self.transform = trans.Compose(image_transforms)
