@@ -1,15 +1,18 @@
 # @package _global_
 
 # Basic settings
-condition_name: baseline_shapes3d
+condition_name: baseline_pentominos3d
 model_name: vqgan
 test: true
 
+# Dataset configuration
 dataset:
-  _target_: src.dataset.shapes3d.Shapes3D
-  path: data/datasets/shapes3d/3dshapes.h5
+  _target_: src.dataset.pentominos.Pentominos3D
+  path: data/datasets/pentominos_3d/
+  prediction_type: unsupervised
   held_out_filter: null
 
+# Model configuration
 model:
   _target_: src.model.vqae.VectorQuantizedGAN
 
