@@ -11,29 +11,64 @@ dataset:
   path: data/datasets/pentominos_3d/
   prediction_type: unsupervised
   held_out_filter: null
+  batch_size: 128
 
 # Model configuration
 model:
   _target_: src.model.vqae.VectorQuantizedGAN
 
-  input_size: [3, 64, 64]  # channels, height, width
+  input_size: [3, 128, 128]  # channels, height, width
   resolution: [16, 16]
-  vocab_size: 256
+  vocab_size: 1024
   token_dim: 64
   beta: 1.0
   discriminator_first_layer_channels: 64
-  discriminator_layers: 3
-  discriminator_learning_rate: 0.0003
+  discriminator_layers: 4
+  discriminator_learning_rate: 0.00005
   discriminator_penalty_warmup: 10_000
 
   # Encoder layers configuration
   encoder_config:
-    # Create 4x4 patches, which produces 16 x 16 tokens
-    - [conv, [64, 4, 4, 0], {bias: false}]
+    # Create 2x2 patches, which produces 64 x 64 tokens
+    - [conv, [64, 2, 2, 0], {bias: false}]
     - [group_norm, [1]]
     - [relu]
 
     # A three layer MLP to process each patch, which shares information in the middle layer
+    - [conv, [64, 1, 1, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 3, 1, 1], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    # Downsample again using 2x2 filters.
+    - [conv, [64, 2, 2, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 3, 1, 1], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
+    # Downsample again using 2x2 filters.
+    - [conv, [64, 2, 2, 0], {bias: false}]
+    - [group_norm, [1]]
+    - [relu]
+
     - [conv, [64, 1, 1, 0], {bias: false}]
     - [group_norm, [1]]
     - [relu]
@@ -75,21 +110,49 @@ model:
     - [group_norm, [1]]
     - [relu]
 
+    # Pixel shuffle for upsampling
+    - [pixel_shuffle, [2], {bias: False}]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 3, 1, 1], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
+    - [conv, [64, 1, 1, 0], {bias: False}]
+    - [group_norm, [1]]
+    - [relu]
+
     - [pixel_shuffle, [2], {bias: False}]
 
     - [conv, [3, 1, 1, 0]]
 
 training:
   optimizer:
-    _target_: torch.optim.Adam
-    lr: 0.0003
+    _target_: torch.optim.AdamW
+    lr: 0.0002
     betas: [0.5, 0.9]
+
+  schedulers:
+    warmup:
+      _target_: src.training.scheduler.WarmupLR
+      _partial_: true
+      start_value: 0.0
+      warmup_steps: 10_000
+
+    cosine_annealing:
+      _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+      _partial_: true
+      eta_min: 0.000001
+      T_max: 400_000
 
   scheduling_metric: val/loss
 
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_steps: 1_000_000  # must do double because there are two optimizer steps during training
+  max_steps: 500_000  # must do double because there are two optimizer steps during training
   accelerator: auto
   devices: auto
   log_every_n_steps: 10

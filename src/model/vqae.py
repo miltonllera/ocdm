@@ -168,6 +168,7 @@ class VectorQuantizedAutoencoder(BaseModel):
     def forward(self, inputs):
         h = self.patch_encoder(inputs)
         B, _, H, W = h.shape
+        assert H, W == self.resolution
         z = self.latent_proj(h.permute(0, 2, 3, 1).flatten(0, 2))
         z_q, idx, dist = self.feature_codebook(z)
         recons = self.patch_decoder(z_q.unflatten(0, (B, H, W)).permute(0, 3, 1, 2))
