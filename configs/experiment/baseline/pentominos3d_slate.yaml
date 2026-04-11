@@ -22,7 +22,7 @@ model:
 
   # Transformer Decoder
   n_head: 4
-  num_layers: 4
+  num_layers: 8
   ffwd_dim: 192
   dropout: 0.1
   use_memory_mask: false
