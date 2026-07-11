@@ -1,6 +1,6 @@
 # @package _global_
 
-condition_name: combgen_pentominos_rotation
+condition_name: combgen_pentominos_rotation_w
 model_name: sa
 test: true
 
@@ -10,7 +10,7 @@ dataset:
   path: data/datasets/pentominos/
   prediction_type: unsupervised
   # held_out_filter: "np.isin( shape , [4, 5, 6, 8,] ) & ( angle >= 180 )"
-  held_out_filter: "( shape == 6 ) & ( angle >= 180 )"
+  held_out_filter: "( shape == 8 ) & ( angle >= 180 )"
   rebalance_dim: shape
 
   # Performance stuff
@@ -27,15 +27,15 @@ model:
     - [conv, [64, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
     - [lrelu]
     - [conv, [64, 4, 2, 1]]
-    - [lrelu]
+    - [relu]
     - [conv, [64, 4, 2, 1]]
-    - [lrelu]
+    - [relu]
     - [permute, [0, 2, 3, 1]]  # Change to channel-last for position embedding
     - [posemb2d, {embed: cardinal}]
     - [flatten, [1, 2]]
     - [layer_norm, [-1]]
     - [linear, [256]]
-    - [lrelu]
+    - [relu]
 
   # Decoder layers configuration
   decoder_config:
@@ -43,9 +43,9 @@ model:
     - [posemb2d, {embed: cardinal}]
     - [permute, [0, 3, 1, 2]]
     - [tconv, [64, 4, 2, 1]]
-    - [lrelu]
+    - [relu]
     - [tconv, [64, 4, 2, 1]]
-    - [lrelu]
+    - [relu]
     - [tconv, [2, 4, 2, 1]]
 
   # Slot Attention parameters

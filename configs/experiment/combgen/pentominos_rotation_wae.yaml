@@ -1,7 +1,7 @@
 # @package _global_
 
 # Basic settings
-condition_name: combgen_pentominos_rotation
+condition_name: combgen_pentominos_rotation_w
 model_name: wae
 test: true
 
@@ -12,7 +12,7 @@ dataset:
   prediction_type: unsupervised
   # held_out_filter: "np.isin( shape , [4, 5, 6, 8,] ) & ( angle >= 180 )"
   # held_out_filter: "(np.isin( shape , [6] ) & ( angle >= 180 )) | np.isin( shape, [0, 1, 2, 3, 4, 5] )"
-  held_out_filter: "( shape == 6 ) & ( angle >= 180 )"
+  held_out_filter: "( shape == 8 ) & ( angle >= 180 )"
   rebalance_dim: shape
 
   # Performance stuff
@@ -52,7 +52,7 @@ model:
     - [tconv, ["${model.input_size.0}", 4, 2, 1]]
 
   # WAE parameters
-  latent_size: 10
+  latent_size: 64
   lambda1: 10.0
   lambda2: 0.001
   prior_type: norm

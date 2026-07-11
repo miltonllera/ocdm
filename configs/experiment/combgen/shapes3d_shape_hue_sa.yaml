@@ -32,7 +32,7 @@ model:
     - [flatten, [1, 2]]
     - [layer_norm, [-1]]
     - [linear, [64]]
-    - [lrelu]
+    - [relu]
 
   # Decoder layers configuration
   decoder_config:
@@ -64,13 +64,13 @@ training:
     exponential:
       _target_: src.training.scheduler.ExponentialLR
       _partial_: true
-      gamma: 0.99999653  # 0.5 ** (1 / 200000)
+      gamma: 0.0.999993068552217  # 0.5 ** (1 / 100000)
       decay_groups: null
     warmup:
       _target_: src.training.scheduler.WarmupLR
       _partial_: true
       start_value: 0.0
-      warmup_steps: 10_000
+      warmup_steps: 3_000
 
   scheduling_metric: val/loss
 

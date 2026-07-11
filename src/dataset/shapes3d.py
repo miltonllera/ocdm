@@ -88,7 +88,8 @@ class Shapes3D(Dataset):
         self.images, self.factor_values, self.factor_classes = self.load_raw(path, data_filter)
 
         # image_transforms = [trans.ToTensor(), trans.Resize((124, 124)), trans.RandomCrop(64)]
-        image_transforms = [trans.Lambda(add_edges), trans.ToTensor()]
+        # image_transforms = [trans.Lambda(add_edges), trans.ToTensor()]
+        image_transforms = [trans.ToTensor()]
         if color_format == 'hsv':
             image_transforms = [trans.Lambda(rgb2hsv)] + image_transforms
         self.transform = trans.Compose(image_transforms)
