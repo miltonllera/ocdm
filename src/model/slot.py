@@ -5,6 +5,7 @@ import torch.nn as nn
 
 from src.model.base import BaseModel, TrainingInit
 from src.nn.slot import SlotAttention, FigureGroundSegmentation
+from src.training.loss import WassersteinMMD
 from src.nn.utils.parsing import create_sequential
 
 
@@ -21,6 +22,7 @@ class SlotAutoencoder(BaseModel):
         slot_channels: int = 1,
         slot_hidden_size: int = 128,
         approx_implicit_grad: bool = True,
+        use_wasserstein_reg: bool = False
     ):
         super().__init__(training)
         self.save_hyperparameters()
@@ -47,6 +49,17 @@ class SlotAutoencoder(BaseModel):
 
         self.decoder = create_sequential(slot_size, decoder_config)
         self.recons_loss = nn.MSELoss(reduction='sum')
+        if use_wasserstein_reg:
+            self.latent_loss_fn = WassersteinMMD(
+                lambda1=10.0,
+                lambda2=0.0,  # No z_param variance regularization
+                prior_type='norm',
+                prior_var=2.0,
+                kernel=None,
+                lambda_schedule=None
+            )
+        else:
+            self.latent_loss_fn = None
 
     def decode(
         self, slots: torch.Tensor, attention_weights: torch.Tensor
@@ -78,13 +91,19 @@ class SlotAutoencoder(BaseModel):
         inputs, targets = batch
         targets = 2 * targets - 1
 
-        recons, _, _ = self.forward(inputs)
+        recons, slots, _ = self.forward(inputs)
 
-        loss = self.recons_loss(recons, targets) / len(targets)
-        is_train = phase == "train"
-        self.log(
-            f"{phase}/loss",
-            loss,
+        recons_loss = self.recons_loss(recons, targets) / len(targets)
+        if is_train := phase == "train" and self.latent_loss_fn is not None:
+            latent_loss = self.latent_loss_fn(slots, None)  # type: ignore
+        else:
+            latent_loss = 0.0
+
+        self.log_dict(
+            {
+                f"{phase}/loss": recons_loss,
+                f"{phase}/latent_loss": latent_loss,
+            },
             on_epoch=not is_train,
             on_step=is_train,
             prog_bar=is_train,
@@ -92,7 +111,7 @@ class SlotAutoencoder(BaseModel):
             rank_zero_only=True
         )
 
-        return loss
+        return recons_loss + latent_loss
 
     def predict(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return self(inputs)
@@ -119,6 +138,7 @@ class FigureGroundAutoencoder(BaseModel):
         slot_channels: int = 1,
         slot_hidden_size: int = 128,
         approx_implicit_grad: bool = False,
+        use_wasserstein_reg: bool = False
     ):
         super().__init__(training)
         self.save_hyperparameters()
@@ -141,6 +161,17 @@ class FigureGroundAutoencoder(BaseModel):
 
         self.decoder = create_sequential(slot_size, decoder_config)
         self.recons_loss = nn.MSELoss(reduction='sum')
+        if use_wasserstein_reg:
+            self.latent_loss_fn = WassersteinMMD(
+                lambda1=10.0,
+                lambda2=0.0,  # No z_param variance regularization
+                prior_type='norm',
+                prior_var=2.0,
+                kernel=None,
+                lambda_schedule=None
+            )
+        else:
+            self.latent_loss_fn = None
 
     def decode(
         self,
@@ -167,14 +198,19 @@ class FigureGroundAutoencoder(BaseModel):
         phase: Literal["train", "val", "test"]
     ):
         inputs, targets = batch
-        recons, _, _ = self.forward(inputs)
+        recons, fig_rep, _ = self.forward(inputs)
 
-        loss = self.recons_loss(recons, targets) / len(targets)
+        recons_loss = self.recons_loss(recons, targets) / len(targets)
+        if is_train := phase == "train" and self.latent_loss_fn is not None:
+            latent_loss = self.latent_loss_fn(fig_rep, None)  # type: ignore
+        else:
+            latent_loss = 0.0
 
-        is_train = phase == "train"
-        self.log(
-            f"{phase}/loss",
-            loss,
+        self.log_dict(
+            {
+                f"{phase}/loss": recons_loss,
+                f"{phase}/latent_loss": latent_loss,
+            },
             on_epoch=not is_train,
             on_step=is_train,
             prog_bar=is_train,
@@ -182,7 +218,7 @@ class FigureGroundAutoencoder(BaseModel):
             rank_zero_only=True
         )
 
-        return loss
+        return recons_loss + latent_loss
 
     def predict(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return self(inputs)
