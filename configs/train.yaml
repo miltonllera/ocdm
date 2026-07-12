@@ -6,6 +6,8 @@ defaults:
   - override hydra/hydra_logging: colorlog
   - override hydra/job_logging: colorlog
 
+seed: null
+
 paths:
   # path to root directory
   # this requires PROJECT_ROOT environment variable to exist
