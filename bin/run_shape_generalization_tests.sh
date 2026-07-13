@@ -18,10 +18,11 @@ shape_filters["8_shapes"]="2,3,4,5,6,8,10,12"
 shape_filters["10_shapes"]="1,2,3,4,5,6,7,8,10,12"
 
 # List of shape names in the order we want to run them
-shape_names=("1_shape" "2_shapes" "4_shapes" "6_shapes" "8_shapes" "10_shapes")
+# shape_names=("1_shape" "2_shapes" "4_shapes" "6_shapes" "8_shapes" "10_shapes")
+shape_names=("10_shapes" )
 
-seeds=(101 102 103 104 105)
-models=("wae" "sa")
+seeds=(101 102 )
+models=("sa" )
 
 for model in "${models[@]}"; do
   for shape_name in "${shape_names[@]}"; do
@@ -48,7 +49,7 @@ for model in "${models[@]}"; do
         ${model_param} \
         seed=${seed} \
         condition_name=combgen_pentominos_rotation_${shape_name}_seed_${seed} \
-        "dataset.held_out_filter=\"${filter_expr}\"" \
+        "dataset.held_out_filter=\"${filter_expr}\""
     done
   done
 done

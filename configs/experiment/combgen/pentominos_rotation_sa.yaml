@@ -24,8 +24,10 @@ model:
 
   # Encoder layers configuration
   encoder_config:
-    - [conv, [64, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
-    - [lrelu]
+    - [conv, [32, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
+    - [relu]
+    - [conv, [32, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
+    - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
     - [conv, [64, 4, 2, 1]]
@@ -39,12 +41,14 @@ model:
 
   # Decoder layers configuration
   decoder_config:
-    - [spatbroad, [8, 8], {input_last: True}]  # Spatial broadcast to 8x8
+    - [spatbroad, [4, 4], {input_last: True}]  # Spatial broadcast to 8x8
     - [posemb2d, {embed: cardinal}]
     - [permute, [0, 3, 1, 2]]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
-    - [tconv, [64, 4, 2, 1]]
+    - [tconv, [32, 4, 2, 1]]
+    - [relu]
+    - [tconv, [32, 4, 2, 1]]
     - [relu]
     - [tconv, [2, 4, 2, 1]]
 
