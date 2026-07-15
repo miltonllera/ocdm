@@ -58,6 +58,7 @@ model:
   slot_channels: 1
   slot_hidden_size: 128
   approx_implicit_grad: false
+  use_wasserstein_reg: false
 
 # Training configuration
 training:

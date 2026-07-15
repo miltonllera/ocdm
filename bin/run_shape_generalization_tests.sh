@@ -14,12 +14,12 @@ shape_filters["1_shape"]="8"
 shape_filters["2_shapes"]="6,8"
 shape_filters["4_shapes"]="4,5,6,8"
 shape_filters["6_shapes"]="2,3,4,5,6,8"
-shape_filters["8_shapes"]="2,3,4,5,6,8,10,12"
-shape_filters["10_shapes"]="1,2,3,4,5,6,7,8,10,12"
+shape_filters["7_shapes"]="2,3,4,5,6,8,10"
+shape_filters["9_shapes"]="1,2,3,4,5,6,7,8,10"
 
 # List of shape names in the order we want to run them
 # shape_names=("1_shape" "2_shapes" "4_shapes" "6_shapes" "8_shapes" "10_shapes")
-shape_names=("10_shapes" )
+shape_names=("9_shapes" )
 
 seeds=(101 102 )
 models=("sa" )
@@ -36,7 +36,7 @@ for model in "${models[@]}"; do
       if [ "$model" = "wae" ]; then
         model_param="model.latent_size=64"
       else
-        model_param="model.slot_size=64"
+        model_param="model.slot_size=64 model.use_wasserstein_reg=true"
       fi
 
       # Build the held-out filter expression
@@ -49,6 +49,7 @@ for model in "${models[@]}"; do
         ${model_param} \
         seed=${seed} \
         condition_name=combgen_pentominos_rotation_${shape_name}_seed_${seed} \
+        model_name='sa_wwr' \
         "dataset.held_out_filter=\"${filter_expr}\""
     done
   done
