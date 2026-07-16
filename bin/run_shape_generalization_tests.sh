@@ -21,7 +21,7 @@ shape_filters["9_shapes"]="1,2,3,4,5,6,7,8,10"
 # shape_names=("1_shape" "2_shapes" "4_shapes" "6_shapes" "8_shapes" "10_shapes")
 shape_names=("9_shapes" )
 
-seeds=(101 102 )
+seeds=(103 104)
 models=("sa" )
 
 for model in "${models[@]}"; do
