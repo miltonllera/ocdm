@@ -30,8 +30,11 @@ paths:
 
 ckpt_path: null
 
+trainer:
+  default_root_dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
+
 hydra:
   run:
-    dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
+    dir: ${trainer.default_root_dir}
   sweep:
     dir: ${paths.log_dir}/multiruns/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
