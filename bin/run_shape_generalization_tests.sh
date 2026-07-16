@@ -49,7 +49,7 @@ for model in "${models[@]}"; do
         ${model_param} \
         seed=${seed} \
         condition_name=combgen_pentominos_rotation_${shape_name}_seed_${seed} \
-        model_name='sa_wwr' \
+        model_name='sa_wwr_diff' \
         "dataset.held_out_filter=\"${filter_expr}\""
     done
   done

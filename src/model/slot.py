@@ -3,6 +3,7 @@ from typing import Literal
 import torch
 import torch.nn as nn
 
+from src.nn.spatial import PositionEmbedding2D
 from src.model.base import BaseModel, TrainingInit
 from src.nn.slot import SlotAttention, FigureGroundSegmentation
 from src.training.loss import WassersteinMMD
@@ -148,10 +149,14 @@ class FigureGroundAutoencoder(BaseModel):
         with torch.no_grad():
             dummy_input = torch.zeros(1, *input_size)
             encoder_output = self.encoder(dummy_input)
-            encoder_output_size = encoder_output.shape[-1]
+            # encoder_output is (B, C, H, W)
+            C, H, W = encoder_output.shape[1:]
+
+        # Shared position embedding at the class level
+        self.pos_emb = PositionEmbedding2D(n_channels=slot_size, height=H, width=W, embed='cardinal')
 
         self.fig_rep = FigureGroundSegmentation(
-            input_size=encoder_output_size,
+            input_size=C,
             latent_size=slot_size,
             n_iter=n_iter,
             n_channels=slot_channels,
@@ -159,7 +164,8 @@ class FigureGroundAutoencoder(BaseModel):
             approx_implicit_grad=approx_implicit_grad
         )
 
-        self.decoder = create_sequential(slot_size, decoder_config)
+        # Decoder receives slot_size features + slot_size positional channels appended
+        self.decoder = create_sequential((2 * slot_size, H, W), decoder_config)
         self.recons_loss = nn.MSELoss(reduction='sum')
         if use_wasserstein_reg:
             self.latent_loss_fn = WassersteinMMD(
@@ -178,16 +184,36 @@ class FigureGroundAutoencoder(BaseModel):
         fig_reps: torch.Tensor,
         attention_weights: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        fig_reps_flat = fig_reps.squeeze(1)
-        rgba = self.decoder(fig_reps_flat)
+        fig_reps_flat = fig_reps.squeeze(1) # (B, slot_size)
+
+        # Spatial broadcast of slots: (B, slot_size, H, W)
+        fig_reps_expanded = fig_reps_flat.unsqueeze(-1).unsqueeze(-1)
+        fig_reps_broadcast = fig_reps_expanded.expand(-1, -1, self.pos_emb.height, self.pos_emb.width)
+
+        # Broadcast position embedding: (B, slot_size, H, W)
+        pos_info = self.pos_emb.projection(self.pos_emb.grid.to(fig_reps.device)).permute(2, 0, 1)
+        pos_info_batch = pos_info.unsqueeze(0).expand(fig_reps_flat.size(0), -1, -1, -1)
+
+        # Concatenate slots and position information along channel dimension
+        decoder_input = torch.cat([fig_reps_broadcast, pos_info_batch], dim=1) # (B, 2 * slot_size, H, W)
+
+        rgba = self.decoder(decoder_input)
         fig_recons, fig_mask_logits = torch.tensor_split(rgba, indices=[-1], dim=1)
         fig_masks = torch.sigmoid(fig_mask_logits)
         recons = fig_masks * fig_recons
         return recons, fig_masks
 
     def forward(self, inputs: torch.Tensor):
-        h = self.encoder(inputs)
-        slots, attention_weights = self.fig_rep(h)
+        h = self.encoder(inputs) # (B, C, H, W)
+
+        # Add positional embedding
+        pos_info = self.pos_emb.projection(self.pos_emb.grid.to(inputs.device)).permute(2, 0, 1)
+        h = h + pos_info
+
+        # Flatten spatial dimensions to (B, H*W, C)
+        h_flat = h.flatten(2).transpose(1, 2)
+
+        slots, attention_weights = self.fig_rep(h_flat)
         recons, decoder_masks = self.decode(slots, attention_weights)
         return recons, slots, decoder_masks
 
@@ -225,7 +251,10 @@ class FigureGroundAutoencoder(BaseModel):
 
     def embed(self, inputs):
         h = self.encoder(inputs)
-        slots, _ = self.fig_rep(h)
+        pos_info = self.pos_emb.projection(self.pos_emb.grid.to(inputs.device)).permute(2, 0, 1)
+        h = h + pos_info
+        h_flat = h.flatten(2).transpose(1, 2)
+        slots, _ = self.fig_rep(h_flat)
         return slots
 
     def reconstruction(self, inputs):

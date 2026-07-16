@@ -32,18 +32,9 @@ model:
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
-    - [permute, [0, 2, 3, 1]]  # Change to channel-last for position embedding
-    - [posemb2d, {embed: cardinal}]
-    - [flatten, [1, 2]]
-    - [layer_norm, [-1]]
-    - [linear, [256]]
-    - [relu]
 
   # Decoder layers configuration
   decoder_config:
-    - [spatbroad, [4, 4], {input_last: True}]  # Spatial broadcast to 8x8
-    - [posemb2d, {embed: cardinal}]
-    - [permute, [0, 3, 1, 2]]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
     - [tconv, [32, 4, 2, 1]]
@@ -92,4 +83,4 @@ trainer:
   val_check_interval: 5000
   check_val_every_n_epoch: null
   fast_dev_run: false
-  default_root_dir: ${paths.log_dir}/figure2/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
+  default_root_dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
