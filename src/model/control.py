@@ -7,6 +7,8 @@ from src.model.base import BaseModel, TrainingInit
 from src.nn.slot import SlotAttention, FigureGroundSegmentation
 from src.nn.stochastic import DiagonalGaussian
 from src.nn.utils.parsing import create_sequential
+from src.nn.spatial import PositionEmbedding2D
+from src.training.loss import WassersteinMMD
 
 
 class SlotDecoderControl(BaseModel):
@@ -188,6 +190,7 @@ class FigureGroundDecoderControl(BaseModel):
         slot_channels: int = 1,
         slot_hidden_size: int = 128,
         approx_implicit_grad: bool = False,
+        use_wasserstein_reg: bool = False,
     ):
         super().__init__(training)
         self.save_hyperparameters()
@@ -197,10 +200,14 @@ class FigureGroundDecoderControl(BaseModel):
         with torch.no_grad():
             dummy_input = torch.zeros(1, *input_size)
             encoder_output = self.encoder(dummy_input)
-            encoder_output_size = encoder_output.shape[-1]
+            # encoder_output is (B, C, H, W)
+            C, H, W = encoder_output.shape[1:]
+
+        # Shared position embedding at the class level
+        self.pos_emb = PositionEmbedding2D(n_channels=slot_size, height=H, width=W, embed='cardinal')
 
         self.fig_rep = FigureGroundSegmentation(
-            input_size=encoder_output_size,
+            input_size=C,
             latent_size=slot_size,
             n_iter=n_iter,
             n_channels=slot_channels,
@@ -208,16 +215,41 @@ class FigureGroundDecoderControl(BaseModel):
             approx_implicit_grad=approx_implicit_grad
         )
 
+        # Decoder receives slot_size features directly (standard fully-connected + conv transpose)
         self.decoder = create_sequential(slot_size, decoder_config)
         self.recons_loss = nn.MSELoss(reduction='sum')
+        if use_wasserstein_reg:
+            self.latent_loss_fn = WassersteinMMD(
+                lambda1=10.0,
+                lambda2=0.0,  # No z_param variance regularization
+                prior_type='norm',
+                prior_var=2.0,
+                kernel=None,
+                lambda_schedule=None
+            )
+        else:
+            self.latent_loss_fn = None
+
+    def decode(self, fig_reps: torch.Tensor) -> torch.Tensor:
+        fig_reps_flat = fig_reps.squeeze(1) # (B, slot_size)
+        recons = self.decoder(fig_reps_flat)
+        return recons
 
     def forward(
             self,
             inputs: torch.Tensor
     ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
-        h = self.encoder(inputs)
-        fig_reps, masks = self.fig_rep(h)
-        recons = self.decoder(fig_reps.squeeze(1))
+        h = self.encoder(inputs) # (B, C, H, W)
+
+        # Add positional embedding
+        pos_info = self.pos_emb.projection(self.pos_emb.grid.to(inputs.device)).permute(2, 0, 1)
+        h = h + pos_info
+
+        # Flatten spatial dimensions to (B, H*W, C)
+        h_flat = h.flatten(2).transpose(1, 2)
+
+        fig_reps, masks = self.fig_rep(h_flat)
+        recons = self.decode(fig_reps)
         return recons, (fig_reps, masks)
 
     def _step(
@@ -229,14 +261,19 @@ class FigureGroundDecoderControl(BaseModel):
         inputs, targets = batch
         targets = 2 * targets - 1
 
-        recons, (_, _) = self.forward(inputs)
+        recons, (fig_rep, _) = self.forward(inputs)
 
-        loss = self.recons_loss(recons, targets) / len(targets)
+        recons_loss = self.recons_loss(recons, targets) / len(targets)
+        if is_train := (phase == "train" and self.latent_loss_fn is not None):
+            latent_loss = self.latent_loss_fn(fig_rep, None)  # type: ignore
+        else:
+            latent_loss = 0.0
 
-        is_train = phase == "train"
-        self.log(
-            f"{phase}/loss",
-            loss,
+        self.log_dict(
+            {
+                f"{phase}/loss": recons_loss + latent_loss,
+                f"{phase}/latent_loss": latent_loss,
+            },
             on_epoch=not is_train,
             on_step=is_train,
             prog_bar=is_train,
@@ -244,14 +281,17 @@ class FigureGroundDecoderControl(BaseModel):
             rank_zero_only=True
         )
 
-        return loss
+        return recons_loss + latent_loss
 
     def predict(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return self(inputs)
 
     def embed(self, inputs: torch.Tensor) -> torch.Tensor:
         h = self.encoder(inputs)
-        fig_reps, _ = self.fig_rep(h)
+        pos_info = self.pos_emb.projection(self.pos_emb.grid.to(inputs.device)).permute(2, 0, 1)
+        h = h + pos_info
+        h_flat = h.flatten(2).transpose(1, 2)
+        fig_reps, _ = self.fig_rep(h_flat)
         return fig_reps
 
     def reconstruction(self, inputs):

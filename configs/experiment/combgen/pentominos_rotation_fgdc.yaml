@@ -1,7 +1,7 @@
 # @package _global_
 
 condition_name: combgen_pentominos_rotation_9_shapes
-model_name: sa
+model_name: fgdc
 test: true
 
 # Dataset configuration
@@ -10,17 +10,12 @@ dataset:
   path: data/datasets/pentominos/
   prediction_type: unsupervised
   held_out_filter: "np.isin( shape , [1,2,3,4,5,6,7,8,10] ) & ( angle >= 180 )"
-  # held_out_filter: "( shape == 8 ) & ( angle >= 180 )"
   rebalance_dim: shape
-
-  # Performance stuff
-  # num_worker: 4
-  # val_split: 0.2
 
 # Model configuration
 model:
-  _target_: src.model.slot.FigureGroundAutoencoder
-  input_size: [1, 64, 64]  # channels, height, width (assuming grayscale, will adapt based on data)
+  _target_: src.model.control.FigureGroundDecoderControl
+  input_size: [1, 64, 64]  # channels, height, width
 
   # Encoder layers configuration
   encoder_config:
@@ -35,21 +30,24 @@ model:
 
   # Decoder layers configuration
   decoder_config:
-    - [tconv, [64, 4, 2, 1]]
+    - [linear, [256]]
     - [relu]
+    - [unflatten, [1, [16, 4, 4]]]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
     - [tconv, [32, 4, 2, 1]]
     - [relu]
-    - [tconv, [2, 4, 2, 1]]
+    - [tconv, [32, 4, 2, 1]]
+    - [relu]
+    - [tconv, [1, 4, 2, 1]]  # Outputs 1 channel directly for reconstruction (grayscale image)
 
-  # Slot Attention parameters
+  # Figure-Ground parameters
   slot_size: 64
   n_iter: 3
   slot_channels: 1
   slot_hidden_size: 128
   approx_implicit_grad: false
-  use_wasserstein_reg: false
+  use_wasserstein_reg: true
 
 # Training configuration
 training:
@@ -61,7 +59,6 @@ training:
     exponential:
       _target_: src.training.scheduler.ExponentialLR
       _partial_: true
-      # gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
       gamma: 0.99999653  # 0.5 ** (1 / 200000)
       decay_groups: null
     warmup:
