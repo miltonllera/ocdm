@@ -356,6 +356,7 @@ class FigureGroundSegmentationV2(nn.Module):
     def reset_parameters(self):
         nn.init.xavier_uniform_(self.init_mu)
         nn.init.xavier_uniform_(self.init_logvar)
+        nn.init.zeros_(self.virtual_slot)
 
         linear_init(self.k_proj, activation='relu')
         linear_init(self.v_proj, activation='relu')
@@ -388,7 +389,12 @@ class FigureGroundSegmentationV2(nn.Module):
             figure_rep = (figure_rep - init_figure_rep).detach() + init_figure_rep
             figure_rep, atten_masks = self.step(figure_rep, k, v)
 
-        return figure_rep.unsqueeze(1), atten_masks.sum(dim=1)  #type: ignore
+        #Add the virtual_slot back to thh representation
+        slots = torch.cat(
+            [self.virtual_slot.expand(len(inputs), 1, -1), figure_rep.unsqueeze(1)], dim=1
+        )
+
+        return slots, atten_masks.sum(dim=1)  #type: ignore
 
     def init_fig_rep(self, inputs):
         std = self.init_logvar.mul(0.5).exp().expand(len(inputs), -1)
@@ -397,15 +403,16 @@ class FigureGroundSegmentationV2(nn.Module):
 
     def step(self, fig_rep, k, v):
         q = self.q_proj(self.norm_slot(fig_rep)).unsqueeze(1)
-        q = torch.cat([self.virtual_slot.expand(len(q), 1, -1), q], dim=1)  # add the virtual slot
+        # q = torch.cat([self.virtual_slot.expand(len(q), 1, -1), q], dim=1)  # add the virtual slot
+        q = torch.cat([torch.zeros_like(q), q], dim=1)  # add the virtual slot
         # atten_maps: (batch_sizs, n_slots, slot_size)
         # atten_weights: (batch_size, n_heads, n_slots, slot_size // n_heads)
         atten_maps, atten_weights = self.compute_attention_maps(k, q, v)
 
         # Note: we let the virtual_slot compete withe the active slot, but don't update it.
-        fig_atten_map, fig_atten_weights = atten_maps[:, 1], atten_weights[:, :, 1]
+        fig_atten_map = atten_maps[:, 1]
         fig_rep = self.update_latent(fig_atten_map, fig_rep)
-        return fig_rep, fig_atten_weights
+        return fig_rep, atten_weights
 
     def compute_attention_maps(self, k, q, v):
         q = split_heads(q, self.nhead)

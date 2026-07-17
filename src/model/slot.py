@@ -156,7 +156,7 @@ class FigureGroundAutoencoder(BaseModel):
         self.pos_emb = PositionEmbedding2D(n_channels=slot_size, height=H, width=W, embed='cardinal')
         self.layer_norm = nn.LayerNorm(slot_size, bias=False)
 
-        self.fig_rep = FigureGroundSegmentationV2(
+        self.fig_rep = FigureGroundSegmentation(
             input_size=C,
             latent_size=slot_size,
             n_iter=n_iter,
@@ -219,6 +219,128 @@ class FigureGroundAutoencoder(BaseModel):
 
         recons_loss = self.recons_loss(recons, targets) / len(targets)
         if is_train := phase == "train" and self.latent_loss_fn is not None:
+            latent_loss = self.latent_loss_fn(fig_rep, None)  # type: ignore
+        else:
+            latent_loss = 0.0
+
+        self.log_dict(
+            {
+                f"{phase}/loss": recons_loss,
+                f"{phase}/latent_loss": latent_loss,
+            },
+            on_epoch=not is_train,
+            on_step=is_train,
+            prog_bar=is_train,
+            sync_dist=not is_train,
+            rank_zero_only=True
+        )
+
+        return recons_loss + latent_loss
+
+    def predict(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return self(inputs)
+
+    def embed(self, inputs):
+        h = self.encoder(inputs)
+        h_flat = self.pos_emb(h.permute(0, 2, 3, 1)).flatten(1, 2)  # (B, H*W, C)
+        slots, _ = self.fig_rep(h_flat)
+        return slots
+
+    def reconstruction(self, inputs):
+        output = self.predict(inputs)[0]
+        return output.clip(0, 1)
+
+
+class FigureGroundAutoencoderV2(BaseModel):
+    def __init__(
+        self,
+        input_size: tuple[int, int, int],
+        encoder_config: list,
+        decoder_config: list,
+        training: TrainingInit,
+        slot_size: int = 64,
+        n_iter: int = 3,
+        slot_channels: int = 1,
+        slot_hidden_size: int = 128,
+        approx_implicit_grad: bool = False,
+        use_wasserstein_reg: bool = False
+    ):
+        super().__init__(training)
+        self.save_hyperparameters()
+
+        self.encoder = create_sequential(input_size, encoder_config)
+
+        with torch.no_grad():
+            dummy_input = torch.zeros(1, *input_size)
+            encoder_output = self.encoder(dummy_input)
+            # encoder_output is (B, C, H, W)
+            C, H, W = encoder_output.shape[1:]
+
+        # Shared position embedding at the class level
+        self.pos_emb = PositionEmbedding2D(n_channels=slot_size, height=H, width=W, embed='cardinal')
+        self.layer_norm = nn.LayerNorm(slot_size, bias=False)
+
+        self.fig_rep = FigureGroundSegmentationV2(
+            input_size=C,
+            latent_size=slot_size,
+            n_iter=n_iter,
+            n_channels=slot_channels,
+            hidden_size=slot_hidden_size,
+            approx_implicit_grad=approx_implicit_grad
+        )
+
+        # Decoder receives slot_size features + slot_size positional channels appended
+        self.decoder = create_sequential((slot_size, H, W), decoder_config)
+        self.recons_loss = nn.MSELoss(reduction='sum')
+        if use_wasserstein_reg:
+            self.latent_loss_fn = WassersteinMMD(
+                lambda1=10.0,
+                lambda2=0.0,  # No z_param variance regularization
+                prior_type='norm',
+                prior_var=2.0,
+                kernel=None,
+                lambda_schedule=None
+            )
+        else:
+            self.latent_loss_fn = None
+
+    def decode(
+        self, slots: torch.Tensor, attention_weights: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        batch_size, n_slots = slots.size()[:2]
+        slots = slots.flatten(end_dim=1)
+
+        # Spatial broadcast of slots: (B, H, W, slot_size)
+        slots = slots.unsqueeze(1).unsqueeze(1)
+        slots = slots.expand(-1, self.pos_emb.height, self.pos_emb.width, -1)
+        slots = slots.permute(0, 3, 1, 2)
+
+        rgba = self.decoder(slots)
+        rgba = rgba.unflatten(0, (batch_size, n_slots))
+        slot_recons, slot_mask_logits = torch.tensor_split(rgba, indices=[-1], dim=2)
+        slot_masks = torch.softmax(slot_mask_logits, dim=1)
+        recons = (slot_masks * slot_recons).sum(dim=1)
+        return recons, slot_masks
+
+    def forward(self, inputs: torch.Tensor):
+        h = self.encoder(inputs) # (B, C, H, W)
+        h_flat = self.layer_norm(self.pos_emb(h.permute(0, 2, 3, 1)).flatten(1, 2))  # (B, H*W, C)
+        slots, attention_weights = self.fig_rep(h_flat)
+        recons, decoder_masks = self.decode(slots, attention_weights)
+        return recons, slots, decoder_masks
+
+    def _step(
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+        phase: Literal["train", "val", "test"]
+    ):
+        inputs, targets = batch
+        recons, fig_rep, _ = self.forward(inputs)
+
+        recons_loss = self.recons_loss(recons, targets) / len(targets)
+        is_train = phase == "train"
+        if is_train and self.latent_loss_fn is not None:
             latent_loss = self.latent_loss_fn(fig_rep, None)  # type: ignore
         else:
             latent_loss = 0.0
