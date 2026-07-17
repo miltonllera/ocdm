@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from src.nn.spatial import PositionEmbedding2D
 from src.model.base import BaseModel, TrainingInit
-from src.nn.slot import SlotAttention, FigureGroundSegmentation
+from src.nn.slot import FigureGroundSegmentationV2, SlotAttention, FigureGroundSegmentation
 from src.training.loss import WassersteinMMD
 from src.nn.utils.parsing import create_sequential
 
@@ -156,7 +156,7 @@ class FigureGroundAutoencoder(BaseModel):
         self.pos_emb = PositionEmbedding2D(n_channels=slot_size, height=H, width=W, embed='cardinal')
         self.layer_norm = nn.LayerNorm(slot_size, bias=False)
 
-        self.fig_rep = FigureGroundSegmentation(
+        self.fig_rep = FigureGroundSegmentationV2(
             input_size=C,
             latent_size=slot_size,
             n_iter=n_iter,
