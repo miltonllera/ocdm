@@ -151,7 +151,7 @@ class FigureGroundAutoencoder(BaseModel):
             encoder_output = self.encoder(dummy_input)
             C, H, W = encoder_output.shape[1:]
 
-        self.pos_emb = PositionEmbedding2D(n_channels=C, height=H, width=W, embed='cardinal')
+        self.pos_emb = PositionEmbedding2D(n_channels=C, height=H, width=W, embed='sine')
         self.embedding_mlp = nn.Sequential(
             nn.LayerNorm(C),
             nn.Linear(C, 4 * C),

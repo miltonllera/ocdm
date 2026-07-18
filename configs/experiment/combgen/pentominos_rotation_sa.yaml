@@ -49,7 +49,7 @@ model:
   slot_channels: 1
   slot_hidden_size: 128
   approx_implicit_grad: false
-  use_wasserstein_reg: false
+  use_wasserstein_reg: True
 
 # Training configuration
 training:
@@ -68,7 +68,7 @@ training:
       _target_: src.training.scheduler.WarmupLR
       _partial_: true
       start_value: 0.0
-      warmup_steps: 30_000
+      warmup_steps: 3_000
 
   scheduling_metric: val/loss
 

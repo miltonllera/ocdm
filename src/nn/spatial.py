@@ -15,6 +15,35 @@ def origin_pos_embedding(resolution, min_val=-1.0, max_val=1.0):
     return grid.to(dtype=torch.float32)
 
 
+def sine_pos_embedding(resolution, n_channels, temperature=10000):
+    H, W = resolution
+    # Standard 2D sinusoidal position embedding (e.g. DETR)
+    num_pos_feats = n_channels // 2
+
+    y_embed = torch.arange(1, H + 1, dtype=torch.float32)
+    x_embed = torch.arange(1, W + 1, dtype=torch.float32)
+
+    dim_t = torch.arange(num_pos_feats // 2, dtype=torch.float32)
+    dim_t = temperature ** (2 * dim_t / num_pos_feats)
+
+    pos_y = y_embed[:, None] / dim_t
+    pos_x = x_embed[:, None] / dim_t
+
+    pos_y = torch.stack([pos_y.sin(), pos_y.cos()], dim=2).flatten(1)
+    pos_x = torch.stack([pos_x.sin(), pos_x.cos()], dim=2).flatten(1)
+
+    pos_y = pos_y.unsqueeze(1).repeat(1, W, 1)
+    pos_x = pos_x.unsqueeze(0).repeat(H, 1, 1)
+
+    grid = torch.cat([pos_y, pos_x], dim=-1)
+
+    if grid.shape[-1] < n_channels:
+        padding = torch.zeros(H, W, n_channels - grid.shape[-1])
+        grid = torch.cat([grid, padding], dim=-1)
+
+    return grid
+
+
 class PositionConcat(nn.Module):
     def __init__(self, height, width=None, dim=-3, embed='origin'):
         super().__init__()
@@ -71,16 +100,21 @@ class PositionEmbedding2D(nn.Module):
         if embed == 'cardinal':
             grid = cardinal_pos_embedding((height, width))
             linear = nn.Linear(4, n_channels)
+            linear_init(linear, activation=None)
+            self.grid = grid.transpose(2, 0)
+            self.projection = linear
         elif embed == 'origin':
             grid = origin_pos_embedding((height, width))
             linear = nn.Linear(2, n_channels)
+            linear_init(linear, activation=None)
+            self.grid = grid.transpose(2, 0)
+            self.projection = linear
+        elif embed == 'sine':
+            grid = sine_pos_embedding((height, width), n_channels)
+            self.grid = grid
+            self.projection = nn.Identity()
         else:
             raise ValueError('Unrecognized embedding type {}'.format(embed))
-
-        linear_init(linear, activation=None)
-
-        self.grid = grid.transpose(2, 0)
-        self.projection = linear
 
     def get_projection(self, device):
         return self.projection(self.grid.to(device=device))
@@ -92,7 +126,8 @@ class PositionEmbedding2D(nn.Module):
         return inputs + proj
 
     def reset_parameters(self):
-        linear_init(self.projection, activation=None)
+        if isinstance(self.projection, nn.Linear):
+            linear_init(self.projection, activation=None)
 
     def __repr__(self):
         return 'PositionEmbedding2D(height={}, width={})'.format(
