@@ -1,6 +1,6 @@
 # @package _global_
 
-condition_name: combgen_pentominos_rotation_w
+condition_name: combgen_pentominos_rotation_9_shapes
 model_name: sa
 test: true
 
@@ -10,7 +10,7 @@ dataset:
   path: data/datasets/pentominos/
   prediction_type: unsupervised
   # held_out_filter: "np.isin( shape , [4, 5, 6, 8,] ) & ( angle >= 180 )"
-  held_out_filter: "( shape == 8 ) & ( angle >= 180 )"
+  held_out_filter: "np.isin( shape, [1,2,3,4,5,6,7,8,10] ) & ( angle >= 180 )"
   rebalance_dim: shape
 
   # Performance stuff
@@ -32,18 +32,9 @@ model:
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
-    - [permute, [0, 2, 3, 1]]  # Change to channel-last for position embedding
-    - [posemb2d, {embed: cardinal}]
-    - [flatten, [1, 2]]
-    - [layer_norm, [-1]]
-    - [linear, [256]]
-    - [relu]
 
   # Decoder layers configuration
   decoder_config:
-    - [spatbroad, [4, 4], {input_last: True}]  # Spatial broadcast to 8x8
-    - [posemb2d, {embed: cardinal}]
-    - [permute, [0, 3, 1, 2]]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
     - [tconv, [32, 4, 2, 1]]
@@ -54,7 +45,7 @@ model:
 
   # Slot Attention parameters
   slot_size: 64
-  n_iter: 1
+  n_iter: 3
   slot_channels: 1
   slot_hidden_size: 128
   approx_implicit_grad: false
@@ -92,4 +83,4 @@ trainer:
   val_check_interval: 5000
   check_val_every_n_epoch: null
   fast_dev_run: false
-  default_root_dir: ${paths.log_dir}/figure2/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
+  default_root_dir: ${paths.log_dir}/test_arch_diffs/refactor_slot/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
