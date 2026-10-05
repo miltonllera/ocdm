@@ -35,6 +35,9 @@ model:
 
   # Decoder layers configuration
   decoder_config:
+    - [linear, [256]]
+    - [relu]
+    - [unflatten, [1, [16, 4, 4]]]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
     - [tconv, [32, 4, 2, 1]]

@@ -22,7 +22,7 @@ class SlotAutoencoder(BaseModel):
         n_iter: int = 3,
         slot_channels: int = 1,
         slot_hidden_size: int = 128,
-        approx_implicit_grad: bool = True,
+        approx_implicit_grad: bool = False,
         use_wasserstein_reg: bool = False
     ):
         super().__init__(training)
@@ -168,7 +168,7 @@ class FigureGroundAutoencoder(BaseModel):
             approx_implicit_grad=approx_implicit_grad
         )
 
-        self.decoder = create_sequential((slot_size, H, W), decoder_config)
+        self.decoder = create_sequential((slot_size,), decoder_config)
         self.recons_loss = nn.MSELoss(reduction='sum')
         if use_wasserstein_reg:
             self.latent_loss_fn = WassersteinMMD(
@@ -187,24 +187,31 @@ class FigureGroundAutoencoder(BaseModel):
         fig_rep: torch.Tensor,
         attention_weights: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        H, W = self.pos_emb.height, self.pos_emb.width
-
-        fig_rep_broadcast = fig_rep.unsqueeze(1).expand(-1, H, W, -1)
-        norm_pos_emb = self.decoder_layer_norm(self.pos_emb.get_projection(fig_rep.device))
-        fig_rep_broadcast = fig_rep_broadcast + norm_pos_emb
-
-        rgba = self.decoder(fig_rep_broadcast.permute(0, 3, 1, 2))
+        rgba = self.decoder(fig_rep.flatten(end_dim=1))
         fig_recons, fig_mask_logits = torch.tensor_split(rgba, indices=[-1], dim=1)
         fig_masks = torch.sigmoid(fig_mask_logits)
         recons = fig_masks * fig_recons
         return recons, fig_masks
 
     def forward(self, inputs: torch.Tensor):
-        h = self.encoder(inputs).permute(0, 2, 3, 1)
-        h = self.embedding_mlp(self.pos_emb(h).flatten(1, 2))
-        slots, attention_weights = self.fig_rep(h)
+        slots, attention_weights = self.encode(inputs)
         recons, decoder_masks = self.decode(slots, attention_weights)
         return recons, slots, decoder_masks
+
+    def encode(self, inputs):
+        h = self.encoder(inputs).permute(0, 2, 3, 1)
+        h = self.embedding_mlp(self.pos_emb(h).flatten(1, 2))
+        return self.fig_rep(h)
+
+    def embed(self, inputs):
+        return self.encode(inputs)[0]
+
+    def predict(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return self(inputs)
+
+    def reconstruction(self, inputs):
+        output = self.predict(inputs)[0]
+        return output.clip(0, 1)
 
     def _step(
         self,
@@ -235,14 +242,3 @@ class FigureGroundAutoencoder(BaseModel):
 
         return recons_loss + latent_loss
 
-    def predict(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        return self(inputs)
-
-    def embed(self, inputs):
-        h = self.encoder(inputs)
-        slots, _ = self.fig_rep(h)
-        return slots
-
-    def reconstruction(self, inputs):
-        output = self.predict(inputs)[0]
-        return output.clip(0, 1)

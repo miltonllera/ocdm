@@ -11,18 +11,18 @@ export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-1}
 
 declare -A shape_filters
 shape_filters["1_shape"]="8"
-shape_filters["2_shapes"]="6,8"
+# shape_filters["2_shapes"]="6,8"
 shape_filters["4_shapes"]="4,5,6,8"
-shape_filters["6_shapes"]="2,3,4,5,6,8"
-shape_filters["7_shapes"]="2,3,4,5,6,8,10"
+# shape_filters["6_shapes"]="2,3,4,5,6,8"
+# shape_filters["7_shapes"]="2,3,4,5,6,8,10"
 shape_filters["9_shapes"]="1,2,3,4,5,6,7,8,10"
 
 # List of shape names in the order we want to run them
 # shape_names=("1_shape" "2_shapes" "4_shapes" "6_shapes" "8_shapes" "10_shapes")
-shape_names=("9_shapes" )
+shape_names=("1_shape" "4_shape" "9_shapes" )
 
-seeds=(101 102 )
-models=("sa" )
+seeds=(102 103 104 105)
+models=("sa_wwr" "wae")
 
 for model in "${models[@]}"; do
   for shape_name in "${shape_names[@]}"; do
@@ -49,7 +49,7 @@ for model in "${models[@]}"; do
         ${model_param} \
         seed=${seed} \
         condition_name=combgen_pentominos_rotation_${shape_name}_seed_${seed} \
-        model_name='sa_wwr' \
+        model_name=$model \
         "dataset.held_out_filter=\"${filter_expr}\""
     done
   done
