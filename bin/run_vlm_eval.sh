@@ -1,7 +1,7 @@
 #!/bin/bash
 
-export CUDA_VISIBLE_DEVICES=2
-RESULTS_FLDR=data/results
+export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-2}
+RESULTS_FLDR=${RESULTS_FLDR:-data/logs}
 
 #-------------------------------- dSprites position generalisation -------------------------------
 

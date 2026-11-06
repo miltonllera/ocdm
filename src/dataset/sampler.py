@@ -17,7 +17,7 @@ class ImbalancedSampler(Sampler):
         df = pl.DataFrame({ "index": self.indices, "label": labels }).sort("index")
 
         # Count occurrences of each label
-        label_counts = df.group_by("label").agg(pl.count().alias("count"))
+        label_counts = df.group_by("label").agg(pl.len().alias("count"))
 
         # Join counts back to the original dataframe
         df = df.join(label_counts, on="label")

@@ -83,11 +83,15 @@ def main(cfg: DictConfig) -> dict[str, float]:
     if not cfg.trainer.fast_dev_run:
         callbacks.append(ExamplePlotsCallback(num_samples=8))
 
+    run_name = f"{cfg.condition_name}_{cfg.model_name}"
+    if cfg.get('seed') is not None and "seed" not in run_name:
+        run_name = f"{run_name}_seed{cfg.seed}"
+
     trainer = instantiate(
         cfg.trainer,
         logger = WandbLogger(
             project='ocdm',
-            name=f"{cfg.condition_name}_{cfg.model_name}",
+            name=run_name,
             save_dir=cfg.trainer.default_root_dir,
             config=OmegaConf.to_container(cfg, resolve=True)
         ) if not cfg.trainer.fast_dev_run else False,
@@ -141,14 +145,16 @@ class ExamplePlotsCallback(pl.Callback):
             x = [dataset[i][0] for i in np.random.choice(len(dataset), size=self.num_samples)]
             x = torch.stack(x).to(device)
 
-            with torch.no_grad():
+            with torch.inference_mode():
                 assert hasattr(pl_module, 'reconstruction')
                 x_hat = pl_module.reconstruction(x)  # type: ignore
 
             n = min(self.num_samples, len(x))
             comparison = torch.cat([x[:n], x_hat[:n]]).cpu()
-            grid = make_grid(comparison, nrow=n, normalize=False).clip(0, 1)
-            wandb_img = wandb.Image(grid, caption=f"{split_name} reconstructions")
+
+            grid = make_grid(comparison, nrow=n, normalize=False)
+            grid = (grid.clip(0, 1).numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
+            wandb_img = wandb.Image(grid, mode='RGB', caption=f"{split_name} reconstructions")
 
             trainer.logger.experiment.log(  # type: ignore
                 {f"{split_name}_reconstructions": wandb_img}

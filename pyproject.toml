@@ -32,7 +32,7 @@ dependencies = [
     "torchvision>=0.22.1",
     "transformers==4.57.6",
     "umap-learn>=0.5.11",
-    "wandb>=0.21.4",
+    "wandb>=0.31.0",
     "jupyter>=1.1.1",
     "streamlit>=1.67.0",
     "watchdog>=7.1.0",

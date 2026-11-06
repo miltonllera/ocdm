@@ -7,6 +7,7 @@ defaults:
   - override hydra/job_logging: colorlog
 
 seed: null
+exp_dir: "baseline"
 
 paths:
   # path to root directory
@@ -31,10 +32,10 @@ paths:
 ckpt_path: null
 
 trainer:
-  default_root_dir: ${paths.log_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
+  default_root_dir: ${paths.log_dir}/${exp_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
 
 hydra:
   run:
     dir: ${trainer.default_root_dir}
   sweep:
-    dir: ${paths.log_dir}/multiruns/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
+    dir: ${paths.log_dir}/multiruns/${exp_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}

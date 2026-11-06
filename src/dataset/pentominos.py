@@ -42,6 +42,7 @@ class Pentominos(Dataset):
         self.image_files = image_files
         self.factor_values = factor_values
         self.factor_classes = factor_classes
+        self.unique_values = Pentominos.unique_values
         self.transform = trans.ToTensor()
         self.prediction_type = prediction_type
 
