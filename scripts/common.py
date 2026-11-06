@@ -23,7 +23,7 @@ _logger = logging.getLogger(__name__)
 
 DATASETS = {
     'dsprites': (DSprites, "data/datasets/dsprites/dsprites_train.hdf5"),
-    'shapes3d': (Shapes3D, "data/datasets/3dshapes/3dshapes.h5"),
+    'shapes3d': (Shapes3D, "data/datasets/shapes3d/3dshapes.h5"),
     'pentominos': (Pentominos, "data/datasets/pentominos"),
 }
 
@@ -35,10 +35,14 @@ MODEL_TYPES = {
 }
 
 
-def compute_embeddings(model, loader, device):
+def compute_embeddings(model, loader, device, progress_callback=None):
     latents = []
-    for x, _ in tqdm(loader, desc="Computing embeddings"):
-        latents.append(model.embed(x.to(device)).cpu().numpy())
+    total = len(loader)
+    with torch.inference_mode():
+        for i, (x, _) in enumerate(tqdm(loader, desc="Computing embeddings")):
+            latents.append(model.embed(x.to(device)).cpu().numpy())
+            if progress_callback is not None:
+                progress_callback(i + 1, total)
     return np.concatenate(latents, axis=0).squeeze()
 
 
