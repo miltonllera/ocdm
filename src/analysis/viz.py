@@ -8,16 +8,6 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 
 
-def strip(ax=None):
-    import matplotlib.pyplot as plt
-    if ax is None:
-        ax = plt.gca()
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_xticklabels([])
-    ax.set_yticklabels([])
-
-
 def create_latent_scatter(
     train_proj: np.ndarray,
     train_color: np.ndarray,
@@ -33,6 +23,9 @@ def create_latent_scatter(
     title: str = "Latent Space Projection",
 ):
     fig = go.Figure()
+    train_proj = np.nan_to_num(train_proj, copy=False)
+    if test_proj is not None:
+        test_proj = np.nan_to_num(test_proj, copy=False)
 
     if is_categorical:
         train_labels = train_color.astype(int)
@@ -106,6 +99,7 @@ def create_latent_scatter(
                         size=marker_size + 2,
                         color=test_color,
                         colorscale=colorscale,
+                        showscale=False,
                         opacity=min(1.0, opacity + 0.3),
                         symbol="diamond",
                     ),
@@ -135,6 +129,7 @@ def create_latent_scatter(
                         size=marker_size + 2,
                         color=test_color,
                         colorscale=colorscale,
+                        showscale=False,
                         opacity=min(1.0, opacity + 0.3),
                         symbol="diamond",
                     ),

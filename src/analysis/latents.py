@@ -1,4 +1,7 @@
 import glob
+import os
+import pickle
+import tempfile
 import time
 import multiprocessing as mp
 from pathlib import Path
@@ -179,7 +182,6 @@ def run_umap_reduction(
         progress_callback(1.0, "UMAP projection complete!")
 
     return {
-        "reducer": reducer,
         "train_proj": train_proj,
         "test_proj": test_proj,
         "metrics": metrics,
@@ -193,41 +195,6 @@ def load_cached_embeddings(embeddings_path: Path):
     train_emb = data["train_embeddings"].squeeze() if "train_embeddings" in data else None
     test_emb = data["test_embeddings"].squeeze() if "test_embeddings" in data else None
     return train_emb, test_emb
-
-
-def compute_and_save_latents(
-    model_name: str,
-    checkpoint_path: Path,
-    dataset_name: str,
-    filter_expr: str,
-    batch_size: int = 64,
-    include_test: bool = True,
-    device: str | None = None,
-):
-    train_dataset, test_dataset, train_loader, test_loader = load_dataset(
-        dataset_name=dataset_name,
-        filter_expr=filter_expr,
-        batch_size=batch_size,
-        num_workers=0,
-    )
-
-    model, model_device = load_model(model_name=model_name, checkpoint_path=checkpoint_path, compile=False)
-    if device is not None:
-        model = model.to(torch.device(device))
-        model_device = torch.device(device)
-
-    train_emb = compute_embeddings(model=model, loader=train_loader, device=model_device)
-    test_emb = None
-    if include_test:
-        test_emb = compute_embeddings(model=model, loader=test_loader, device=model_device)
-
-    embeddings_path = checkpoint_path.parent / "embeddings.npz"
-    save_dict = {"train_embeddings": train_emb}
-    if test_emb is not None:
-        save_dict["test_embeddings"] = test_emb
-    np.savez(embeddings_path, **save_dict)
-
-    return train_emb, test_emb, train_dataset, test_dataset
 
 
 _ACTIVE_PROCESS = None
@@ -244,6 +211,7 @@ def cancel_active_reduction_process():
 
 
 def _reduction_process_worker(out_queue, prog_queue, method, kwargs):
+    temp_path = None
     try:
         def on_progress(frac, text):
             prog_queue.put((frac, text))
@@ -253,8 +221,17 @@ def _reduction_process_worker(out_queue, prog_queue, method, kwargs):
         else:
             res = run_umap_reduction(**kwargs, progress_callback=on_progress)
 
-        out_queue.put(("SUCCESS", res))
+        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
+            temp_path = f.name
+            pickle.dump(res, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+        out_queue.put(("SUCCESS", temp_path))
     except Exception as e:
+        if temp_path is not None and os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
         out_queue.put(("ERROR", str(e)))
 
 
@@ -273,6 +250,9 @@ def run_reduction_in_process(method: str, kwargs: dict, progress_callback=None, 
     _ACTIVE_PROCESS = proc
     proc.start()
 
+    status = None
+    payload = None
+
     try:
         while proc.is_alive():
             while not prog_queue.empty():
@@ -282,6 +262,14 @@ def run_reduction_in_process(method: str, kwargs: dict, progress_callback=None, 
                         progress_callback(frac, text)
                 except Exception:
                     break
+
+            if not out_queue.empty():
+                try:
+                    status, payload = out_queue.get_nowait()
+                    break
+                except Exception:
+                    pass
+
             time.sleep(poll_interval)
 
         while not prog_queue.empty():
@@ -292,12 +280,28 @@ def run_reduction_in_process(method: str, kwargs: dict, progress_callback=None, 
             except Exception:
                 break
 
-        if not out_queue.empty():
-            status, payload = out_queue.get()
-            if status == "SUCCESS":
-                return payload
-            else:
-                raise RuntimeError(f"Error in {method} process: {payload}")
+        if payload is None and not out_queue.empty():
+            try:
+                status, payload = out_queue.get_nowait()
+            except Exception:
+                pass
+
+        proc.join(timeout=3.0)
+
+        if status == "SUCCESS" and payload is not None:
+            temp_path = payload
+            try:
+                with open(temp_path, "rb") as f:
+                    result = pickle.load(f)
+                return result
+            finally:
+                if os.path.exists(temp_path):
+                    try:
+                        os.unlink(temp_path)
+                    except OSError:
+                        pass
+        elif status == "ERROR":
+            raise RuntimeError(f"Error in {method} process: {payload}")
         else:
             raise RuntimeError(f"{method} process terminated prematurely with exit code {proc.exitcode}")
     finally:
