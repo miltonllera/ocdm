@@ -90,7 +90,7 @@ class SlotAutoencoder(BaseModel):
         phase: Literal["train", "val", "test"]
     ) -> torch.Tensor:
         inputs, targets = batch
-        targets = 2 * targets - 1
+        # targets = 2 * targets - 1
 
         recons, slots, _ = self.forward(inputs)
 
@@ -123,7 +123,8 @@ class SlotAutoencoder(BaseModel):
         return slots
 
     def reconstruction(self, inputs):
-        output = (self.predict(inputs)[0] + 1) / 2
+        # output = (self.predict(inputs)[0] + 1) / 2
+        output = self.predict(inputs)[0]
         return output.clip(0, 1)
 
 
