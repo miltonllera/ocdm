@@ -22,7 +22,7 @@ class CompositionNet(BaseModel):
         beta: float = 1.0,
     ):
         super().__init__(training)
-        self.save_hyperparameters()
+        self.save_hyperparameters(logger=False)
 
         # Build encoder from config
         self.encoder = create_sequential(input_size, encoder_config)

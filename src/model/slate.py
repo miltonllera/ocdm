@@ -39,7 +39,7 @@ class SLATE(BaseModel):
 
     ):
         super().__init__(training)
-        self.save_hyperparameters()
+        self.save_hyperparameters(logger=False)
 
         backbone = SLATE._load_backbone(backbone_type, backbone_checkpoint)
         backbone.requires_grad_(False)

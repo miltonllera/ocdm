@@ -18,7 +18,7 @@ class Regressor(BaseModel):
         prediction_dim: int | None,
     ) -> None:
         super().__init__(training)
-        self.save_hyperparameters()
+        self.save_hyperparameters(logger=False)
 
         if regression_type == 'binary':
             criterion = nn.BCEWithLogitsLoss()

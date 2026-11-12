@@ -32,7 +32,7 @@ class DiscreteAutoencoder(BaseModel):
         tau_steps: float | None = None,
     ):
         super().__init__(training)
-        self.save_hyperparameters()
+        self.save_hyperparameters(logger=False)
 
         H, W = resolution
         self.patch_encoder = create_sequential(input_size, encoder_config)

@@ -30,7 +30,7 @@ class VariationalAutoencoder(BaseModel):
         recons_loss: Literal["bce", "mse", "l1"] = "mse",
     ):
         super().__init__(training)
-        self.save_hyperparameters()
+        self.save_hyperparameters(logger=False)
 
         self.encoder = create_sequential(input_size, encoder_config)
 

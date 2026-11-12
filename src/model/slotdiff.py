@@ -35,7 +35,7 @@ class SlotDiffusion(BaseModel):
         dropout: float = 0.1,
     ):
         super().__init__(training)
-        self.save_hyperparameters()
+        self.save_hyperparameters(logger=False)
 
         backbone = SlotDiffusion._load_backbone(backbone_type, backbone_checkpoint)
         backbone.requires_grad_(False)
