@@ -6,8 +6,8 @@ FAST_DEV_RUN=${FAST_DEV_RUN:-false}
 MAX_STEPS=${MAX_STEPS:-500000}
 
 # models=("vae" "wae" "sa" "sa_wwr")
-models=("sa" "sa_wwr")
-latent_sizes=(16 64 128)
+models=("sa" )
+latent_sizes=(64 )
 
 run_benchmark() {
   local dataset="$1"
