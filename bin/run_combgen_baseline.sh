@@ -5,7 +5,8 @@ export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
 MAX_STEPS=${MAX_STEPS:-500000}
 
-models=("sa_wwr")
+# models=("vae" "wae" "sa" "sa_wwr")
+models=("sa" "sa_wwr")
 latent_sizes=(16 64 128)
 
 run_benchmark() {
@@ -31,7 +32,7 @@ run_benchmark() {
       elif [[ "$model" == "sa_wwr" || "$model" == "sa+wwr" ]]; then
         base_model="sa"
         model="sa_wwr"
-        model_params=("model.slot_size=$hs" "model.use_wasserstein_reg=true")
+        model_params=("model.slot_size=$ls" "model.use_wasserstein_reg=true")
       fi
 
       echo "Training ${model} (latent/slot size: ${ls}) on ${condition_name}..."
