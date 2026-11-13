@@ -37,7 +37,10 @@ def main(cfg: DictConfig) -> dict[str, float]:
     _logger.info("Starting training...")
 
     # Set seed
-    seed = pl.seed_everything(cfg.get('seed', int(datetime.now().timestamp())))
+    seed = cfg.get('seed')
+    if seed is None:
+        seed = int(datetime.now().timestamp())
+    seed = pl.seed_everything(seed)
 
     # Create components
     _logger.info("Creating datamodule...")

@@ -3,7 +3,7 @@
 # Basic settings
 exp_dir: baseline
 condition_name: baseline_pentominos
-model_name: sa_diff_arch
+model_name: sa
 test: true
 
 dataset:
@@ -11,10 +11,10 @@ dataset:
   path: data/datasets/pentominos/
   prediction_type: unsupervised
   held_out_filter: null
-  held_out_filter: null
   rebalance_dim: null
-
   num_workers: 4
+  # val_split: 0.2
+
 
 model:
   _target_: src.model.slot.FigureGroundAutoencoder
@@ -22,28 +22,15 @@ model:
 
   # Encoder layers configuration
   encoder_config:
-    # Create 4x4 patches, which produces 16 x 16 tokens
-    - [conv, [64, 4, 4, 0], {bias: false}]
-    - [group_norm, [1]]
+    - [conv, [16, 4, 2, 1]]
     - [relu]
-
-    # A three layer MLP to process each patch, which shares info
-    - [conv, [64, 1, 1, 0], {bias: false}]
-    - [group_norm, [1]]
+    - [conv, [32, 4, 2, 1]]
     - [relu]
-
-    - [conv, [64, 3, 1, 1], {bias: false}]
-    - [group_norm, [1]]
+    - [conv, [64, 4, 2, 1]]
     - [relu]
-
-    - [conv, [64, 1, 1, 0], {bias: false}]
-    - [group_norm, [1]]
-    - [relu]
-
     - [permute, [0, 2, 3, 1]]
     - [posemb2d, {embed: cardinal}]
     - [flatten, [1, 2]]
-
     - [layer_norm, [-1]]
     - [linear, [64]]
     - [relu]
@@ -53,37 +40,12 @@ model:
     - [spatbroad, [16, 16], {input_last: True}]
     - [posemb2d, {embed: cardinal}]
     - [permute, [0, 3, 1, 2]]
-
-    # Three layer stack of convolutions which share information in the middle layer
-    - [conv, [64, 1, 1, 0], {bias: False}]
-    - [group_norm, [1]]
+    - [conv, [64, 1, 1, 0]]
     - [relu]
-
-    - [conv, [64, 3, 1, 1], {bias: False}]
-    - [group_norm, [1]]
+    - [tconv, [32, 4, 2, 1]]
     - [relu]
-
-    - [conv, [64, 1, 1, 0], {bias: False}]
-    - [group_norm, [1]]
+    - [tconv, [16, 4, 2, 1]]
     - [relu]
-
-    # Pixel shuffle for upsampling
-    - [pixel_shuffle, [2], {bias: False}]
-
-    - [conv, [64, 1, 1, 0], {bias: False}]
-    - [group_norm, [1]]
-    - [relu]
-
-    - [conv, [64, 3, 1, 1], {bias: False}]
-    - [group_norm, [1]]
-    - [relu]
-
-    - [conv, [64, 1, 1, 0], {bias: False}]
-    - [group_norm, [1]]
-    - [relu]
-
-    - [pixel_shuffle, [2], {bias: False}]
-
     - [conv, [2, 1, 1, 0]]
 
   # Slot Attention parameters
@@ -92,7 +54,6 @@ model:
   slot_channels: 1
   slot_hidden_size: 128
   approx_implicit_grad: false
-
   use_wasserstein_reg: false
 
 training:
@@ -110,7 +71,7 @@ training:
       _target_: src.training.scheduler.WarmupLR
       _partial_: true
       start_value: 0.0
-      warmup_steps: 20_000
+      warmup_steps: 3_000
 
   scheduling_metric: val/loss
 
@@ -122,7 +83,7 @@ trainer:
   accelerator: auto
   devices: auto
   log_every_n_steps: 10
-  val_check_interval: 5000
+  val_check_interval: 5_000
   check_val_every_n_epoch: null
   fast_dev_run: false
   default_root_dir: ${paths.log_dir}/${exp_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}

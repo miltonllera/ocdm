@@ -1,0 +1,83 @@
+# @package _global_
+
+# Basic settings
+exp_dir: baseline
+condition_name: baseline_dsprites
+model_name: wae
+test: true
+
+dataset:
+  _target_: src.dataset.dsprites.DSprites
+  path: data/datasets/dsprites/dsprites_train.hdf5
+  held_out_filter: null
+  rebalance_dim: null
+  num_workers: 4
+  # val_split: 0.2
+
+
+model:
+  _target_: src.model.vae.WassersteinMMDAE
+  input_size: [1, 64, 64]  # channels, height, width (RGB)
+
+  # Encoder layers configuration
+  encoder_config:
+    - [conv, [16, 4, 2, 1]]
+    - [relu]
+    - [conv, [32, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [permute, [0, 2, 3, 1]]
+    - [flatten]
+    - [layer_norm, [-1]]
+    - [linear, [64]]
+    - [relu]
+
+  # Decoder layers configuration
+  decoder_config:
+    - [spatbroad, [16, 16], {input_last: True}]
+    - [posemb2d, {embed: cardinal}]
+    - [permute, [0, 3, 1, 2]]
+    - [conv, [64, 1, 1, 0]]
+    - [relu]
+    - [tconv, [32, 4, 2, 1]]
+    - [relu]
+    - [tconv, [16, 4, 2, 1]]
+    - [relu]
+    - [conv, [1, 1, 1, 0]]
+
+  # WAE parameters
+  latent_size: 10
+  lambda1: 10.0
+  lambda2: 0.001
+  prior_type: norm
+  prior_var: 2.0
+
+
+training:
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: 0.001
+    weight_decay: 0.0
+
+  schedulers:
+    warmup:
+      _target_: torch.optim.lr_scheduler.LinearLR
+      start_factor: 0.1
+      total_iters: 1000
+
+  scheduling_metric: val/loss
+
+
+trainer:
+  _target_: lightning.pytorch.Trainer
+  max_steps: 100_000
+  gradient_clip_val: 1.0
+  accelerator: auto
+  devices: auto
+  log_every_n_steps: 10
+  val_check_interval: 5000
+  check_val_every_n_epoch: null
+  fast_dev_run: false
+  default_root_dir: ${paths.log_dir}/${exp_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}
+

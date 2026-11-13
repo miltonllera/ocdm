@@ -122,10 +122,10 @@ class SlotAutoencoder(BaseModel):
         slots, _ = self.slot_attention(h)
         return slots
 
-    def reconstruction(self, inputs):
-        # output = (self.predict(inputs)[0] + 1) / 2
-        output = self.predict(inputs)[0]
-        return output.clip(0, 1)
+    def reconstruction(self, inputs, return_masks=False):
+        output, decoder_masks = self.predict(inputs)[:2]
+        output = output.clip(0, 1)
+        return (output, decoder_masks) if return_masks else output
 
 
 class FigureGroundAutoencoder(BaseModel):
@@ -148,20 +148,15 @@ class FigureGroundAutoencoder(BaseModel):
         self.encoder = create_sequential(input_size, encoder_config)
 
         with torch.no_grad():
-            dummy_input = torch.zeros(1, *input_size)
+            if isinstance(input_size, int):
+                dummy_input = torch.zeros(1, input_size)
+            else:
+                dummy_input = torch.zeros(1, *input_size)
             encoder_output = self.encoder(dummy_input)
-            C, H, W = encoder_output.shape[1:]
-
-        self.pos_emb = PositionEmbedding2D(n_channels=C, height=H, width=W, embed='sine')
-        self.embedding_mlp = nn.Sequential(
-            nn.LayerNorm(C),
-            nn.Linear(C, 4 * C),
-            nn.ReLU()
-        )
-        self.decoder_layer_norm = nn.LayerNorm(slot_size)
+            encoder_output_size = encoder_output.shape[-1]
 
         self.fig_rep = FigureGroundSegmentation(
-            input_size=4 * C,
+            input_size=encoder_output_size,
             latent_size=slot_size,
             n_iter=n_iter,
             n_channels=slot_channels,
@@ -169,8 +164,9 @@ class FigureGroundAutoencoder(BaseModel):
             approx_implicit_grad=approx_implicit_grad
         )
 
-        self.decoder = create_sequential((slot_size,), decoder_config)
+        self.decoder = create_sequential(slot_size, decoder_config)
         self.recons_loss = nn.MSELoss(reduction='sum')
+
         if use_wasserstein_reg:
             self.latent_loss_fn = WassersteinMMD(
                 lambda1=10.0,
@@ -200,9 +196,7 @@ class FigureGroundAutoencoder(BaseModel):
         return recons, slots, decoder_masks
 
     def encode(self, inputs):
-        h = self.encoder(inputs).permute(0, 2, 3, 1)
-        h = self.embedding_mlp(self.pos_emb(h).flatten(1, 2))
-        return self.fig_rep(h)
+        return self.fig_rep(self.encoder(inputs))
 
     def embed(self, inputs):
         return self.encode(inputs)[0]

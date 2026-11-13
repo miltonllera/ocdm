@@ -11,11 +11,10 @@ dataset:
   path: data/datasets/dsprites/dsprites_train.hdf5
   batch_size: 64
   held_out_filter: null
-  # Performance stuff
+  rebalance_dim: null
   num_workers: 4
   # val_split: 0.2
 
-  rebalance_dim: null
 
 model:
   _target_: src.model.vae.WassersteinMMDAE

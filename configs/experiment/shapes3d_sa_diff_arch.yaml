@@ -23,7 +23,7 @@ model:
 
   # Encoder layers configuration
   encoder_config:
-    - [conv, [16, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
+    - [conv, [16, 4, 2, 1]]
     - [relu]
     - [conv, [32, 4, 2, 1]]
     - [relu]
