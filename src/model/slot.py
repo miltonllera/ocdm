@@ -210,9 +210,10 @@ class FigureGroundAutoencoder(BaseModel):
     def predict(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return self(inputs)
 
-    def reconstruction(self, inputs):
-        output = self.predict(inputs)[0]
-        return output.clip(0, 1)
+    def reconstruction(self, inputs, return_masks=False):
+        output, masks = self.predict(inputs)[:2]
+        output = output.clip(0, 1)
+        return (output, masks) if return_masks else output
 
     def _step(
         self,
