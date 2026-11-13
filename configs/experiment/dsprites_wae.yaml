@@ -78,7 +78,7 @@ trainer:
   accelerator: auto
   devices: auto
   val_check_interval: 5000
-  ckheck_val_every_n_epoch: null
+  check_val_every_n_epoch: null
   log_every_n_steps: 10
   fast_dev_run: false
   default_root_dir: ${paths.log_dir}/${exp_dir}/${condition_name}/${model_name}/${now:%Y-%m-%d}_${now:%H-%M}

@@ -5,8 +5,8 @@ export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
 MAX_STEPS=${MAX_STEPS:-500000}
 
-models=("sa")
-latent_sizes=(16 32 64 128)
+models=("wae" "sa")
+latent_sizes=(16 32 64)
 
 run_benchmark() {
   local dataset="$1"
@@ -38,7 +38,7 @@ run_benchmark() {
 
       uv run python -m scripts.train \
         experiment="${dataset}_${base_model}" \
-        exp_dir=combgen_arch_tests \
+        exp_dir=combgen \
         condition_name="${condition_name}" \
         model_name="${model}_ls${ls}" \
         "dataset.held_out_filter=\"${filter_expr}\"" \
@@ -51,13 +51,13 @@ run_benchmark() {
 }
 
 # 1. LiLS Replication: dSprites heart position
-# run_benchmark "dsprites" "combgen_dsprites_heart_position" "( shape == 3 ) & ( posX > 0.5 )"
+run_benchmark "dsprites" "combgen_dsprites_heart_position" "( shape == 3 ) & ( posX > 0.5 )"
 
 # 2. LiLS Replication: 3DShapes shape & hue
-run_benchmark "shapes3d" "combgen_shapes3d_shape_hue" "( shape == 3 ) & ( object_hue < 0.5 )"
+# run_benchmark "shapes3d" "combgen_shapes3d_shape_hue" "( shape == 3 ) & ( object_hue < 0.5 )"
 
 # 3. Failure Mode Replication: dSprites heart rotation
-# run_benchmark "dsprites" "combgen_dsprites_heart_rotation" "( shape == 3 ) & ( orientation < np.pi )"
+run_benchmark "dsprites" "combgen_dsprites_heart_rotation" "( shape == 3 ) & ( orientation < np.pi )"
 
 # 4. LiLS Replication: 3DShapes shape & hue
-# run_benchmark "shapes3d" "combgen_shapes3d_shape_scale" "( shape == 3 ) & ( object_hue > 1.0 )"
+# run_benchmark "shapes3d" "combgen_shapes3d_shape_scale" "( shape == 3 ) & ( scale > 1.0 )"
