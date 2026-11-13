@@ -5,9 +5,8 @@ export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
 MAX_STEPS=${MAX_STEPS:-500000}
 
-# models=("vae" "wae" "sa" "sa_wwr")
-models=("sa" )
-latent_sizes=(64 )
+models=("sa")
+latent_sizes=(16 32 64 128)
 
 run_benchmark() {
   local dataset="$1"
@@ -39,7 +38,7 @@ run_benchmark() {
 
       uv run python -m scripts.train \
         experiment="${dataset}_${base_model}" \
-        exp_dir=combgen \
+        exp_dir=combgen_arch_tests \
         condition_name="${condition_name}" \
         model_name="${model}_ls${ls}" \
         "dataset.held_out_filter=\"${filter_expr}\"" \
@@ -59,3 +58,6 @@ run_benchmark "shapes3d" "combgen_shapes3d_shape_hue" "( shape == 3 ) & ( object
 
 # 3. Failure Mode Replication: dSprites heart rotation
 # run_benchmark "dsprites" "combgen_dsprites_heart_rotation" "( shape == 3 ) & ( orientation < np.pi )"
+
+# 4. LiLS Replication: 3DShapes shape & hue
+# run_benchmark "shapes3d" "combgen_shapes3d_shape_scale" "( shape == 3 ) & ( object_hue > 1.0 )"
