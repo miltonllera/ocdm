@@ -3,7 +3,7 @@
 # Basic settings
 exp_dir: baseline
 condition_name: baseline_shapes3d
-model_name: sa_diff_arch
+model_name: sa
 test: true
 
 dataset:
@@ -23,9 +23,9 @@ model:
 
   # Encoder layers configuration
   encoder_config:
-    - [conv, [64, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
+    - [conv, [16, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
     - [relu]
-    - [conv, [64, 1, 1, 0]]
+    - [conv, [32, 4, 2, 1]]
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
@@ -41,11 +41,13 @@ model:
     - [spatbroad, [16, 16], {input_last: True}]
     - [posemb2d, {embed: cardinal}]
     - [permute, [0, 3, 1, 2]]
-    - [tconv, [64, 4, 2, 1]]
+    - [conv, [64, 1, 1, 0]]
     - [relu]
-    - [tconv, [64, 4, 2, 1]]
+    - [tconv, [32, 4, 2, 1]]
     - [relu]
-    - [tconv, [4, 1, 1, 0]]
+    - [tconv, [16, 4, 2, 1]]
+    - [relu]
+    - [conv, [4, 1, 1, 0]]
 
   # Slot Attention parameters
   n_slots: 4

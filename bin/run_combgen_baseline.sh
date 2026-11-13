@@ -54,10 +54,10 @@ run_benchmark() {
 run_benchmark "dsprites" "combgen_dsprites_heart_position" "( shape == 3 ) & ( posX > 0.5 )"
 
 # 2. LiLS Replication: 3DShapes shape & hue
-# run_benchmark "shapes3d" "combgen_shapes3d_shape_hue" "( shape == 3 ) & ( object_hue < 0.5 )"
+run_benchmark "shapes3d" "combgen_shapes3d_shape_hue" "( shape == 3 ) & ( object_hue < 0.5 )"
 
 # 3. Failure Mode Replication: dSprites heart rotation
 run_benchmark "dsprites" "combgen_dsprites_heart_rotation" "( shape == 3 ) & ( orientation < np.pi )"
 
 # 4. LiLS Replication: 3DShapes shape & hue
-# run_benchmark "shapes3d" "combgen_shapes3d_shape_scale" "( shape == 3 ) & ( scale > 1.0 )"
+run_benchmark "shapes3d" "combgen_shapes3d_shape_scale" "( shape == 3 ) & ( scale > 1.0 )"
