@@ -155,7 +155,7 @@ class ExamplePlotsCallback(pl.Callback):
             n = min(self.num_samples, len(x))
             comparison = torch.cat([x[:n], x_hat[:n]]).cpu()
 
-            grid = make_grid(comparison, nrow=n, normalize=False)
+            grid = make_grid(comparison, nrow=n, padding=2, pad_value=0.5, normalize=False)
             grid = (grid.clip(0, 1).numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
             wandb_img = wandb.Image(grid, mode='RGB', caption=f"{split_name} reconstructions")
 
