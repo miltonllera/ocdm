@@ -1,3 +1,4 @@
+import inspect
 import rootutils
 import logging
 from datetime import datetime
@@ -141,6 +142,11 @@ class ExamplePlotsCallback(pl.Callback):
         if not hasattr(pl_module, 'reconstruction'):
             return
 
+        def to_wandb_grid(tensors: torch.Tensor, nrow: int, caption: str) -> wandb.Image:
+            grid = make_grid(tensors.cpu(), nrow=nrow, padding=2, pad_value=0.5, normalize=False)
+            grid_np = (grid.clip(0, 1).numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
+            return wandb.Image(grid_np, mode='RGB', caption=caption)
+
         def log_reconstructions_from_loader(dataset, split_name):
             if dataset is None:
                 return
@@ -148,20 +154,35 @@ class ExamplePlotsCallback(pl.Callback):
             x = [dataset[i][0] for i in np.random.choice(len(dataset), size=self.num_samples)]
             x = torch.stack(x).to(device)
 
+            supports_masks = "return_masks" in inspect.signature(pl_module.reconstruction).parameters
             with torch.inference_mode():
                 assert hasattr(pl_module, 'reconstruction')
-                x_hat = pl_module.reconstruction(x)  # type: ignore
+                if supports_masks:
+                    x_hat, masks = pl_module.reconstruction(x, return_masks=True)  # type: ignore
+                else:
+                    x_hat = pl_module.reconstruction(x)  # type: ignore
+                    masks = None
 
             n = min(self.num_samples, len(x))
-            comparison = torch.cat([x[:n], x_hat[:n]]).cpu()
+            comparison = torch.cat([x[:n], x_hat[:n]])
+            log_dict = {
+                f"{split_name}_reconstructions": to_wandb_grid(
+                    comparison, nrow=n, caption=f"{split_name} reconstructions"
+                )
+            }
 
-            grid = make_grid(comparison, nrow=n, padding=2, pad_value=0.5, normalize=False)
-            grid = (grid.clip(0, 1).numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
-            wandb_img = wandb.Image(grid, mode='RGB', caption=f"{split_name} reconstructions")
+            if masks is not None:
+                if masks.ndim == 4:
+                    # FigureGroundAutoencoder returns (B, 1, H, W); unify with (B, S, 1, H, W)
+                    masks = masks.unsqueeze(1)
+                masks = masks[:n].expand(-1, -1, x.size(1), -1, -1)
+                mask_rows = masks.transpose(0, 1).flatten(end_dim=1)
+                mask_comparison = torch.cat([x[:n], mask_rows])
+                log_dict[f"{split_name}_masks"] = to_wandb_grid(
+                    mask_comparison, nrow=n, caption=f"{split_name} masks"
+                )
 
-            trainer.logger.experiment.log(  # type: ignore
-                {f"{split_name}_reconstructions": wandb_img}
-            )
+            trainer.logger.experiment.log(log_dict)  # type: ignore
 
         # Validation reconstructions
         if hasattr(trainer.datamodule, "val_dataloader"):  # type: ignore
