@@ -123,7 +123,7 @@ class SlotAutoencoder(BaseModel):
         return slots
 
     def reconstruction(self, inputs, return_masks=False):
-        output, decoder_masks = self.predict(inputs)[:2]
+        output, _, decoder_masks = self.predict(inputs)
         output = output.clip(0, 1)
         return (output, decoder_masks) if return_masks else output
 
@@ -205,7 +205,7 @@ class FigureGroundAutoencoder(BaseModel):
         return self(inputs)
 
     def reconstruction(self, inputs, return_masks=False):
-        output, masks = self.predict(inputs)[:2]
+        output, _, masks = self.predict(inputs)
         output = output.clip(0, 1)
         return (output, masks) if return_masks else output
 

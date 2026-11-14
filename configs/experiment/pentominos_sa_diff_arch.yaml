@@ -37,16 +37,29 @@ model:
 
   # Decoder layers configuration
   decoder_config:
-    - [spatbroad, [16, 16], {input_last: True}]
-    - [posemb2d, {embed: cardinal}]
-    - [permute, [0, 3, 1, 2]]
+    - [linear, [4024]]
+    - [relu]
+    - [unflatten, [1, [16, 16, 16]]]
     - [conv, [64, 1, 1, 0]]
     - [relu]
     - [tconv, [32, 4, 2, 1]]
     - [relu]
     - [tconv, [16, 4, 2, 1]]
     - [relu]
-    - [conv, [2, 1, 1, 0]]
+    - [conv, [3, 4, 2, 1]]
+
+  # # Decoder layers configuration
+  # decoder_config:
+  #   - [spatbroad, [16, 16], {input_last: True}]
+  #   - [posemb2d, {embed: cardinal}]
+  #   - [permute, [0, 3, 1, 2]]
+  #   - [conv, [64, 1, 1, 0]]
+  #   - [relu]
+  #   - [tconv, [32, 4, 2, 1]]
+  #   - [relu]
+  #   - [tconv, [16, 4, 2, 1]]
+  #   - [relu]
+  #   - [conv, [2, 1, 1, 0]]
 
   # Slot Attention parameters
   slot_size: 16
