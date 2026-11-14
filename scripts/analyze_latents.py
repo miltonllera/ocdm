@@ -77,7 +77,10 @@ def main(
     umap_metric: str = "euclidean",
     include_test: bool = False,
     sample_size: int = 10000,
+    umap_subsample_ratio: float = 1.0,
 ):
+    if not (0.0 < umap_subsample_ratio <= 1.0):
+        raise ValueError(f"umap_subsample_ratio must be in (0, 1], got {umap_subsample_ratio}")
     output_dir = output_dir / model_checkpoint.parts[-2]
     output_dir.mkdir(parents=True, exist_ok=True)
     prefix = f"{model_name}_{dataset_name}"
@@ -129,10 +132,29 @@ def main(
     pca_fig.write_html(str(output_dir / f"{prefix}_pca_explained_variance.html"))
     pca_fig.write_image(str(output_dir / f"{prefix}_pca_explained_variance.png"))
 
-    _logger.info("Running UMAP analysis on full dataset...")
+    if umap_subsample_ratio < 1.0:
+        umap_train_size = max(1, int(len(embeddings) * umap_subsample_ratio))
+        _logger.info(
+            f"Subsampling {umap_subsample_ratio:.2%} before UMAP ({umap_train_size} train points)..."
+        )
+        umap_train_emb, umap_train_factors, _ = subsample_points(
+            embeddings, factor_values, umap_train_size
+        )
+        if test_embeddings is not None and test_factor_values is not None:
+            umap_test_size = max(1, int(len(test_embeddings) * umap_subsample_ratio))
+            umap_test_emb, umap_test_factors, _ = subsample_points(
+                test_embeddings, test_factor_values, umap_test_size
+            )
+        else:
+            umap_test_emb, umap_test_factors = None, None
+    else:
+        _logger.info("Running UMAP analysis on full dataset...")
+        umap_train_emb, umap_train_factors = embeddings, factor_values
+        umap_test_emb, umap_test_factors = test_embeddings, test_factor_values
+
     umap_res = run_umap_reduction(
-        train_embeddings=embeddings,
-        test_embeddings=test_embeddings,
+        train_embeddings=umap_train_emb,
+        test_embeddings=umap_test_emb,
         n_components=3,
         n_neighbors=umap_n_neighbors,
         min_dist=umap_min_dist,
@@ -143,35 +165,38 @@ def main(
     umap_fig.write_html(str(output_dir / f"{prefix}_umap_metrics.html"))
     umap_fig.write_image(str(output_dir / f"{prefix}_umap_metrics.png"))
 
-    # Subsample full projections for scatter plotting
-    train_pca_sub, train_factors_sub, _ = subsample_points(
+    # Subsample projections for scatter plotting (PCA and UMAP keep their own aligned factor arrays)
+    train_pca_sub, train_pca_factors_sub, _ = subsample_points(
         pca_res["train_proj"], factor_values, sample_size
     )
-    train_umap_sub, _, _ = subsample_points(umap_res["train_proj"], factor_values, sample_size)
+    train_umap_sub, train_umap_factors_sub, _ = subsample_points(
+        umap_res["train_proj"], umap_train_factors, sample_size
+    )
 
     test_pca_sub = None
     test_umap_sub = None
-    test_factors_sub = None
+    test_pca_factors_sub = None
+    test_umap_factors_sub = None
     if test_embeddings is not None and test_factor_values is not None:
         test_size = max(100, int(len(test_embeddings) * (sample_size / len(embeddings))))
-        test_pca_sub, test_factors_sub, _ = subsample_points(
+        test_pca_sub, test_pca_factors_sub, _ = subsample_points(
             pca_res["test_proj"], test_factor_values, test_size
         )
-        test_umap_sub, _, _ = subsample_points(umap_res["test_proj"], test_factor_values, test_size)
+        umap_plot_test_size = max(100, int(len(umap_test_emb) * (sample_size / len(umap_train_emb))))
+        test_umap_sub, test_umap_factors_sub, _ = subsample_points(
+            umap_res["test_proj"], umap_test_factors, umap_plot_test_size
+        )
 
     # Generate factor scatter plots
     for i, factor_name in enumerate(factor_names):
         is_categorical = factor_name == "shape"
         label_map = train_dataset.map_shapes if hasattr(train_dataset, "map_shapes") else None
 
-        train_c = train_factors_sub[:, i]
-        test_c = test_factors_sub[:, i] if test_factors_sub is not None else None
-
         pca_scatter = create_latent_scatter(
             train_proj=train_pca_sub,
-            train_color=train_c,
+            train_color=train_pca_factors_sub[:, i],
             test_proj=test_pca_sub,
-            test_color=test_c,
+            test_color=test_pca_factors_sub[:, i] if test_pca_factors_sub is not None else None,
             factor_name=factor_name,
             is_categorical=is_categorical,
             label_map=label_map,
@@ -182,9 +207,9 @@ def main(
 
         umap_scatter = create_latent_scatter(
             train_proj=train_umap_sub,
-            train_color=train_c,
+            train_color=train_umap_factors_sub[:, i],
             test_proj=test_umap_sub,
-            test_color=test_c,
+            test_color=test_umap_factors_sub[:, i] if test_umap_factors_sub is not None else None,
             factor_name=factor_name,
             is_categorical=is_categorical,
             label_map=label_map,
@@ -232,6 +257,8 @@ def build_parser():
         help="Include test embeddings in UMAP projection")
     p.add_argument("--sample_size", type=int, default=10000,
         help="Sample size for scatter plots")
+    p.add_argument("--umap_subsample_ratio", type=float, default=1.0,
+        help="Subsample ratio in (0, 1] applied independently to train and test before fitting UMAP (default: 1.0)")
     return p
 
 

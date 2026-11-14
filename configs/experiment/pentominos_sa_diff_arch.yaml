@@ -22,9 +22,9 @@ model:
 
   # Encoder layers configuration
   encoder_config:
-    - [conv, [16, 4, 2, 1]]
+    - [conv, [64, 4, 2, 1]]
     - [relu]
-    - [conv, [32, 4, 2, 1]]
+    - [conv, [64, 4, 2, 1]]
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
@@ -37,16 +37,42 @@ model:
 
   # Decoder layers configuration
   decoder_config:
-    - [linear, [4024]]
-    - [relu]
-    - [unflatten, [1, [16, 16, 16]]]
-    - [conv, [64, 1, 1, 0]]
-    - [relu]
+    - [spatbroad, [8, 8], {input_last: True}]
+    - [posemb2d, {embed: cardinal}]
+    - [permute, [0, 3, 1, 2]]
     - [tconv, [32, 4, 2, 1]]
     - [relu]
     - [tconv, [16, 4, 2, 1]]
     - [relu]
-    - [conv, [3, 4, 2, 1]]
+    - [tconv, [2, 4, 2, 1]]
+
+  # # Encoder layers configuration
+  # encoder_config:
+  #   - [conv, [16, 4, 2, 1]]
+  #   - [relu]
+  #   - [conv, [32, 4, 2, 1]]
+  #   - [relu]
+  #   - [conv, [64, 4, 2, 1]]
+  #   - [relu]
+  #   - [permute, [0, 2, 3, 1]]
+  #   - [posemb2d, {embed: cardinal}]
+  #   - [flatten, [1, 2]]
+  #   - [layer_norm, [-1]]
+  #   - [linear, [64]]
+  #   - [relu]
+
+  # # Decoder layers configuration
+  # decoder_config:
+  #   - [linear, [4024]]
+  #   - [relu]
+  #   - [unflatten, [1, [16, 16, 16]]]
+  #   - [conv, [64, 1, 1, 0]]
+  #   - [relu]
+  #   - [tconv, [32, 4, 2, 1]]
+  #   - [relu]
+  #   - [tconv, [16, 4, 2, 1]]
+  #   - [relu]
+  #   - [conv, [2, 4, 2, 1]]
 
   # # Decoder layers configuration
   # decoder_config:

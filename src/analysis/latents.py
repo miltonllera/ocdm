@@ -142,6 +142,8 @@ def run_umap_reduction(
         n_components=n_components,
         n_neighbors=n_neighbors,
         min_dist=min_dist,
+        init='spectral',
+        compatibility_layout=False,
         metric=metric,
         random_state=random_state,
         n_jobs=-1 if random_state is None else 1,
