@@ -37,4 +37,5 @@ dependencies = [
     "streamlit>=1.67.0",
     "watchdog>=7.1.0",
     "black>=26.10.1",
+    "pillow>=13.0.0",
 ]
