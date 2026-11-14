@@ -119,7 +119,7 @@ def main(cfg: DictConfig) -> dict[str, float]:
     if cfg.get('test', False):
         _logger.info("Starting test phase...")
         ckpt_path = ckpt_mng.best_model_path if not trainer.fast_dev_run else None
-        trainer.test(model, datamodule=datamodule, ckpt_path=ckpt_path)
+        trainer.test(model, datamodule=datamodule, ckpt_path=ckpt_path, weights_only=False)
         test_metrics = {k: float(v) for k, v in trainer.callback_metrics.items() if 'test' in k}
 
     _logger.info("Run completed.")

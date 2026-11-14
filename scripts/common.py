@@ -79,7 +79,7 @@ def load_or_compute_embeddings(
 
 
 def load_model(model_name: str, checkpoint_path: Path, compile=True):
-    model = MODEL_TYPES[model_name].load_from_checkpoint(checkpoint_path)
+    model = MODEL_TYPES[model_name].load_from_checkpoint(checkpoint_path, weights_only=False)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
     model.eval()
