@@ -74,66 +74,50 @@ def create_latent_scatter(
                         marker=dict(size=marker_size + 2, opacity=opacity + 0.2, symbol="diamond"),
                     ))
     else:
-        if is_3d:
-            x, y, z = train_proj[:, 0], train_proj[:, 1], train_proj[:, 2]
-            fig.add_trace(go.Scatter3d(
-                x=x, y=y, z=z,
+        cmin = float(np.nanmin(train_color))
+        cmax = float(np.nanmax(train_color))
+        if test_color is not None and len(test_color) > 0:
+            cmin = min(cmin, float(np.nanmin(test_color)))
+            cmax = max(cmax, float(np.nanmax(test_color)))
+
+        scatter_cls = go.Scatter3d if is_3d else go.Scatter
+
+        def _coords(proj):
+            if is_3d:
+                return {"x": proj[:, 0], "y": proj[:, 1], "z": proj[:, 2]}
+            return {"x": proj[:, 0], "y": proj[:, 1]}
+
+        fig.add_trace(scatter_cls(
+            **_coords(train_proj),
+            mode="markers",
+            name="Train",
+            marker=dict(
+                size=marker_size,
+                color=train_color,
+                colorscale=colorscale,
+                cmin=cmin,
+                cmax=cmax,
+                colorbar=dict(title=factor_name),
+                opacity=opacity,
+                symbol="circle",
+            ),
+        ))
+        if test_proj is not None and test_color is not None:
+            fig.add_trace(scatter_cls(
+                **_coords(test_proj),
                 mode="markers",
-                name="Train",
+                name="Test",
                 marker=dict(
-                    size=marker_size,
-                    color=train_color,
+                    size=marker_size + 2,
+                    color=test_color,
                     colorscale=colorscale,
-                    colorbar=dict(title=factor_name),
-                    opacity=opacity,
-                    symbol="circle",
+                    cmin=cmin,
+                    cmax=cmax,
+                    showscale=False,
+                    opacity=min(1.0, opacity + 0.3),
+                    symbol="diamond",
                 ),
             ))
-            if test_proj is not None and test_color is not None:
-                tx, ty, tz = test_proj[:, 0], test_proj[:, 1], test_proj[:, 2]
-                fig.add_trace(go.Scatter3d(
-                    x=tx, y=ty, z=tz,
-                    mode="markers",
-                    name="Test",
-                    marker=dict(
-                        size=marker_size + 2,
-                        color=test_color,
-                        colorscale=colorscale,
-                        showscale=False,
-                        opacity=min(1.0, opacity + 0.3),
-                        symbol="diamond",
-                    ),
-                ))
-        else:
-            x, y = train_proj[:, 0], train_proj[:, 1]
-            fig.add_trace(go.Scatter(
-                x=x, y=y,
-                mode="markers",
-                name="Train",
-                marker=dict(
-                    size=marker_size,
-                    color=train_color,
-                    colorscale=colorscale,
-                    colorbar=dict(title=factor_name),
-                    opacity=opacity,
-                    symbol="circle",
-                ),
-            ))
-            if test_proj is not None and test_color is not None:
-                tx, ty = test_proj[:, 0], test_proj[:, 1]
-                fig.add_trace(go.Scatter(
-                    x=tx, y=ty,
-                    mode="markers",
-                    name="Test",
-                    marker=dict(
-                        size=marker_size + 2,
-                        color=test_color,
-                        colorscale=colorscale,
-                        showscale=False,
-                        opacity=min(1.0, opacity + 0.3),
-                        symbol="diamond",
-                    ),
-                ))
 
     layout_args = dict(
         template="plotly_white",

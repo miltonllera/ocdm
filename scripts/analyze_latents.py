@@ -93,7 +93,9 @@ def main(
     factor_names = type(train_dataset).factors
 
     _logger.info("Loading model...")
-    model, device = load_model(model_name=model_name, checkpoint_path=model_checkpoint, compile=False)
+    model, device = load_model(
+        model_name=model_name, checkpoint_path=model_checkpoint, compile=False
+    )
 
     embeddings = load_or_compute_embeddings(
         embeddings_path=embeddings_path,
@@ -120,7 +122,9 @@ def main(
         _logger.info(f"Test embeddings shape: {test_embeddings.shape}")
 
     _logger.info("Running PCA analysis on full dataset...")
-    pca_res = run_pca_reduction(train_embeddings=embeddings, test_embeddings=test_embeddings, n_components=3)
+    pca_res = run_pca_reduction(
+        train_embeddings=embeddings, test_embeddings=test_embeddings, n_components=3
+    )
     pca_fig = create_pca_variance_plot(pca_res["explained_variance_ratio"])
     pca_fig.write_html(str(output_dir / f"{prefix}_pca_explained_variance.html"))
     pca_fig.write_image(str(output_dir / f"{prefix}_pca_explained_variance.png"))
@@ -140,7 +144,9 @@ def main(
     umap_fig.write_image(str(output_dir / f"{prefix}_umap_metrics.png"))
 
     # Subsample full projections for scatter plotting
-    train_pca_sub, train_factors_sub, _ = subsample_points(pca_res["train_proj"], factor_values, sample_size)
+    train_pca_sub, train_factors_sub, _ = subsample_points(
+        pca_res["train_proj"], factor_values, sample_size
+    )
     train_umap_sub, _, _ = subsample_points(umap_res["train_proj"], factor_values, sample_size)
 
     test_pca_sub = None
@@ -148,7 +154,9 @@ def main(
     test_factors_sub = None
     if test_embeddings is not None and test_factor_values is not None:
         test_size = max(100, int(len(test_embeddings) * (sample_size / len(embeddings))))
-        test_pca_sub, test_factors_sub, _ = subsample_points(pca_res["test_proj"], test_factor_values, test_size)
+        test_pca_sub, test_factors_sub, _ = subsample_points(
+            pca_res["test_proj"], test_factor_values, test_size
+        )
         test_umap_sub, _, _ = subsample_points(umap_res["test_proj"], test_factor_values, test_size)
 
     # Generate factor scatter plots
