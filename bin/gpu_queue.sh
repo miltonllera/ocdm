@@ -12,6 +12,7 @@ _GPU_PIDS=()
 _GPU_LOG_DIR=""
 _GPU_FAILED=0
 _FREE_GPU_IDX=0
+_LAST_LAUNCH_SEC=""
 
 _gpu_pool_detect() {
   if [[ -n "${GPUS:-}" ]]; then
@@ -80,6 +81,14 @@ gpu_pool_run() {
   shift
 
   _gpu_pool_acquire
+  local now_sec
+  now_sec=$(date +%s)
+  if [[ "$now_sec" == "${_LAST_LAUNCH_SEC}" ]]; then
+    sleep 1
+    now_sec=$(date +%s)
+  fi
+  _LAST_LAUNCH_SEC="$now_sec"
+
   local gpu_id="${_GPU_LIST[$_FREE_GPU_IDX]}"
   local log_file="${_GPU_LOG_DIR}/${job_name}.log"
 

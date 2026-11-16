@@ -1,13 +1,17 @@
 #!/bin/bash
 
+source "$(dirname "$0")/gpu_queue.sh"
+
 # Default GPU device and settings
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
 MAX_STEPS=${MAX_STEPS:-500000}
+LOG_DIR=${LOG_DIR:-"logs/controls/launcher"}
 
 models=("fgdc" "fgc")
 slot_sizes=(16 32 64)
 num_runs=5
+
+gpu_pool_init "${LOG_DIR}"
 
 run_control_suite() {
   local task="$1"
@@ -22,7 +26,8 @@ run_control_suite() {
       for run in $(seq 1 "$num_runs"); do
         echo "Training ${model} (slot size: ${ls}, run: ${run}) on ${task}..."
 
-        uv run python -m scripts.train \
+        gpu_pool_run "${task}_${model}_ls${ls}_run${run}" \
+          uv run python -m scripts.train \
           experiment="dsprites_${model}" \
           exp_dir=controls \
           condition_name="control_dsprites_${task}" \
@@ -42,3 +47,5 @@ run_control_suite "heart_position" "( shape == 3 ) & ( posX < 0.5 )"
 
 # 2. Slot Attention Control: heart-rotation
 run_control_suite "heart_rotation" "( shape == 3 ) & ( orientation < np.pi )"
+
+gpu_pool_wait

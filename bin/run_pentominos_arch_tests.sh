@@ -60,7 +60,7 @@ build_decoder_config() {
   if [[ "$broadcast" == "8x8" ]]; then
     echo "[[spatbroad,[8,8],{input_last:true}],[posemb2d,{embed:cardinal}],[permute,[0,3,1,2]],[tconv,[${c1},4,2,1]],[relu],[tconv,[${c2},4,2,1]],[relu],[tconv,[${out_ch},4,2,1]]]"
   else
-    echo "[[spatbroad,[16,16],{input_last:true}],[posemb2d,{embed:cardinal}],[permute,[0,3,1,2]],[tconv,[${c1},4,2,1]],[relu],[tconv,[${c2},4,2,1]],[relu],[conv,[${out_ch},1,1,0]]]"
+    echo "[[spatbroad,[16,16],{input_last:true}],[posemb2d,{embed:cardinal}],[permute,[0,3,1,2]],[tconv,[64,1,1,0]],[tconv,[${c1},4,2,1]],[relu],[tconv,[${c2},4,2,1]],[relu],[conv,[${out_ch},1,1,0]]]"
   fi
 }
 

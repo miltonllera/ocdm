@@ -1,9 +1,11 @@
 #!/bin/bash
 
+source "$(dirname "$0")/gpu_queue.sh"
+
 # Default GPU device and settings
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
 MAX_STEPS=${MAX_STEPS:-500000}
+LOG_DIR=${LOG_DIR:-"logs/pentominos_rotation/launcher"}
 
 # Define the shape configurations (nested sets)
 declare -A shape_filters
@@ -16,12 +18,14 @@ shape_names=("1_shape" "4_shapes" "9_shapes")
 
 models=("sa_wwr" "wae")
 
+gpu_pool_init "${LOG_DIR}"
+
 for s in {1..5}; do
   for model in "${models[@]}"; do
     for shape_name in "${shape_names[@]}"; do
     shape_list="${shape_filters[$shape_name]}"
       echo "========================================================================="
-      echo "Training ${model} with ${shape_name} (shapes: [${shape_list}])"
+      echo "Training ${model} with ${shape_name} (shapes: [${shape_list}]), run ${s}"
       echo "========================================================================="
 
       base_model=""
@@ -36,7 +40,8 @@ for s in {1..5}; do
 
       filter_expr="np.isin(shape, [${shape_list}]) & (angle >= 180)"
 
-      uv run python -m scripts.train \
+      gpu_pool_run "${model}_${shape_name}_run${s}" \
+        uv run python -m scripts.train \
         experiment="pentominos_${base_model}" \
         exp_dir=pentominos_rotation \
         condition_name="combgen_pentominos_rotation_${shape_name}" \
@@ -49,3 +54,5 @@ for s in {1..5}; do
     done
   done
 done
+
+gpu_pool_wait

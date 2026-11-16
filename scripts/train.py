@@ -19,8 +19,6 @@ from src.dataset.datamodule import CompositionTaskDataModule, DisentangledDataMo
 from src.training.optim import TrainingInit
 
 import torch
-torch.autograd.set_detect_anomaly(True)
-
 
 rootutils.setup_root(".", cwd=True)
 
@@ -103,6 +101,9 @@ def main(cfg: DictConfig) -> dict[str, float]:
         max_epochs=-1,  # NOTE: training steps is defined directly
         # strategy='ddp_find_unused_parameters_true'
     )
+
+    if cfg.trainer.fast_dev_run:
+        torch.autograd.set_detect_anomaly(False)
 
     # Train
     _logger.info("Starting training phase...")

@@ -1,13 +1,17 @@
 #!/bin/bash
 
+source "$(dirname "$0")/gpu_queue.sh"
+
 # Configuration and defaults
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
 MAX_STEPS=${MAX_STEPS:-100000}
+LOG_DIR=${LOG_DIR:-"logs/baseline/launcher"}
 
 datasets=("dsprites" "shapes3d" "pentominos")
 models=("vae" "wae" "sa")
 latent_sizes=(16 32 64)
+
+gpu_pool_init "${LOG_DIR}"
 
 for dataset in "${datasets[@]}"; do
   for model in "${models[@]}"; do
@@ -23,7 +27,8 @@ for dataset in "${datasets[@]}"; do
         model_params=("model.slot_size=$ls")
       fi
 
-      uv run python -m scripts.train \
+      gpu_pool_run "${dataset}_${model}_ls${ls}" \
+        uv run python -m scripts.train \
         experiment="${dataset}_${model}" \
         exp_dir=baseline \
         condition_name="baseline_${dataset}" \
@@ -34,3 +39,5 @@ for dataset in "${datasets[@]}"; do
     done
   done
 done
+
+gpu_pool_wait

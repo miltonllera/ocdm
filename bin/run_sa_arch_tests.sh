@@ -1,12 +1,15 @@
 #!/bin/bash
 
+source "$(dirname "$0")/gpu_queue.sh"
+
 # Configuration and defaults
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
 MAX_STEPS=${MAX_STEPS:-500000}
-
+LOG_DIR=${LOG_DIR:-"logs/combgen_arch_tests/launcher"}
 
 models=("wae" "sa")
+
+gpu_pool_init "${LOG_DIR}"
 
 run_benchmark() {
   local dataset="$1"
@@ -28,7 +31,8 @@ run_benchmark() {
       model_params=("model.slot_size=64")
     fi
 
-    uv run python -m scripts.train \
+    gpu_pool_run "${condition_name}_${model}" \
+      uv run python -m scripts.train \
       experiment="${dataset}_${model}_diff_arch" \
       exp_dir=combgen_arch_tests \
       condition_name="${condition_name}" \
@@ -58,4 +62,6 @@ run_benchmark "pentominos" "combgen_pentominos_shape_position" "( shape == 8 ) &
 #
 # 6. Test with different condition on Shapes 3D
 # run_benchmark "shapes_3d" "combgen_shapes3d_shape_scale" "( shape == 3 ) & ( scale > 1.0 )"
+
+gpu_pool_wait
 

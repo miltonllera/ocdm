@@ -1,12 +1,16 @@
 #!/bin/bash
 
+source "$(dirname "$0")/gpu_queue.sh"
+
 # Configuration and defaults
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
 MAX_STEPS=${MAX_STEPS:-500000}
+LOG_DIR=${LOG_DIR:-"logs/combgen/launcher"}
 
 models=("wae" "sa")
 latent_sizes=(16 32 64)
+
+gpu_pool_init "${LOG_DIR}"
 
 run_benchmark() {
   local dataset="$1"
@@ -36,7 +40,8 @@ run_benchmark() {
 
       echo "Training ${model} (latent/slot size: ${ls}) on ${condition_name}..."
 
-      uv run python -m scripts.train \
+      gpu_pool_run "${condition_name}_${model}_ls${ls}" \
+        uv run python -m scripts.train \
         experiment="${dataset}_${base_model}" \
         exp_dir=combgen \
         condition_name="${condition_name}" \
@@ -61,3 +66,5 @@ run_benchmark "dsprites" "combgen_dsprites_heart_rotation" "( shape == 3 ) & ( o
 
 # 4. LiLS Replication: 3DShapes shape & hue
 run_benchmark "shapes3d" "combgen_shapes3d_shape_scale" "( shape == 3 ) & ( scale > 1.0 )"
+
+gpu_pool_wait

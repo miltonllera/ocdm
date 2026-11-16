@@ -1,9 +1,11 @@
 #!/bin/bash
 
+source "$(dirname "$0")/gpu_queue.sh"
+
 # Default GPU device and settings
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
 MAX_STEPS=${MAX_STEPS:-500000}
+LOG_DIR=${LOG_DIR:-"logs/shape_extrapolation/launcher"}
 
 # Define the shape configurations (nested sets)
 # 1 shape: [8] (W)
@@ -20,12 +22,14 @@ shape_names=("1_shape" "4_shapes" "9_shapes")
 
 models=("sa_wwr" "wae")
 
+gpu_pool_init "${LOG_DIR}"
+
 for i in {1..5}; do
   for model in "${models[@]}"; do
     for shape_name in "${shape_names[@]}"; do
       shape_list="${shape_filters[$shape_name]}"
       echo "========================================================================="
-      echo "Training ${model} extrapolation with ${shape_name} (shapes: [${shape_list}]), seed ${seed}"
+      echo "Training ${model} extrapolation with ${shape_name} (shapes: [${shape_list}]), run ${i}"
       echo "========================================================================="
 
       base_model=""
@@ -40,7 +44,8 @@ for i in {1..5}; do
 
       filter_expr="np.isin(shape, [${shape_list}])"
 
-      uv run python -m scripts.train \
+      gpu_pool_run "${model}_${shape_name}_run${i}" \
+        uv run python -m scripts.train \
         experiment="pentominos_${base_model}" \
         exp_dir=shape_extrapolation \
         condition_name="extrap_pentominos_${shape_name}" \
@@ -53,3 +58,5 @@ for i in {1..5}; do
     done
   done
 done
+
+gpu_pool_wait
