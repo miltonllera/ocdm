@@ -14,7 +14,7 @@ dataset:
   # Performance stuff
   num_workers: 4
   # val_split: 0.2
-
+  batch_size: 64
   rebalance_dim: null
 
 model:

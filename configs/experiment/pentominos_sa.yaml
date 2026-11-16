@@ -12,7 +12,7 @@ dataset:
   prediction_type: unsupervised
   held_out_filter: null
   rebalance_dim: null
-
+  batch_size: 64
   # Performance stuff
   num_workers: 4
   # val_split: 0.2
