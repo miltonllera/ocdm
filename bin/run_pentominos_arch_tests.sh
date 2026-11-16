@@ -7,12 +7,14 @@
 #       tapered:   16 -> 32 -> 64 (encoder) and reverse (decoder)
 #       untapered: 64 -> 64 -> 64 (encoder and decoder)
 
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+source "$(dirname "$0")/gpu_queue.sh"
+
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
 MAX_STEPS=${MAX_STEPS:-500000}
 LATENT_SIZE=${LATENT_SIZE:-64}
 
 EXP_DIR=${EXP_DIR:-pentominos_arch_tests}
+LOG_DIR=${LOG_DIR:-"logs/${EXP_DIR}/launcher"}
 CONDITION_NAME="combgen_pentominos_shape_rotation"
 FILTER_EXPR="( shape == 8 ) & (angle >= 180)"
 
@@ -67,6 +69,8 @@ echo "Running Pentominos Architecture Tests: ${CONDITION_NAME}"
 echo "Output folder: ${EXP_DIR}"
 echo "========================================================================="
 
+gpu_pool_init "${LOG_DIR}"
+
 for model in "${models[@]}"; do
   for broadcast in "${broadcasts[@]}"; do
     for taper in "${tapers[@]}"; do
@@ -80,9 +84,9 @@ for model in "${models[@]}"; do
       fi
 
       run_name="${model}_b${broadcast}_${taper}"
-      echo "Training ${run_name} (latent/slot size: ${LATENT_SIZE})..."
 
-      uv run python -m scripts.train \
+      gpu_pool_run "${run_name}" \
+        uv run python -m scripts.train \
         experiment="pentominos_${model}" \
         exp_dir="${EXP_DIR}" \
         condition_name="${CONDITION_NAME}" \
@@ -98,3 +102,5 @@ for model in "${models[@]}"; do
     done
   done
 done
+
+gpu_pool_wait
