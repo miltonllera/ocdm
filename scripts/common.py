@@ -12,7 +12,7 @@ from src.model.vae import BetaVAE, WassersteinMMDAE
 from src.model.slot import SlotAutoencoder, FigureGroundAutoencoder
 from src.dataset.dsprites import DSprites
 from src.dataset.shapes3d import Shapes3D
-from src.dataset.pentominos import Pentominos
+from src.dataset.pentominos import Pentominos, Pentominos3D
 from src.dataset.utils import build_filter
 
 
@@ -25,6 +25,9 @@ DATASETS = {
     'dsprites': (DSprites, "data/datasets/dsprites/dsprites_train.hdf5"),
     'shapes3d': (Shapes3D, "data/datasets/shapes3d/3dshapes.h5"),
     'pentominos': (Pentominos, "data/datasets/pentominos"),
+    'pentominos_colored': (Pentominos, "data/datasets/pentominos_colored"),
+    'pentominos_colored_black_background': (Pentominos, "data/datasets/pentominos_colored_black_background"),
+    'pentominos_3d': (Pentominos3D, str(Path.home() / "Repos/vision/blender stuff/data/temp/pentominos_3d")),
 }
 
 MODEL_TYPES = {
@@ -86,13 +89,32 @@ def load_model(model_name: str, checkpoint_path: Path, compile=True):
     return torch.compile(model), device
 
 
-def load_dataset(dataset_name: str, filter_expr: str, batch_size: int = 64, num_workers: int = 4):
-    dataset_class, path = DATASETS[dataset_name]
+def _instantiate_dataset(dataset_class, path: str, data_filter=None):
+    if dataset_class is Pentominos3D:
+        return dataset_class(path, held_out_filter=data_filter)
+    return dataset_class(path, data_filter=data_filter)
+
+
+def load_dataset(
+    dataset_name: str,
+    filter_expr: str | None = None,
+    batch_size: int = 64,
+    num_workers: int = 4,
+    dataset_path: str | None = None,
+):
+    dataset_class, default_path = DATASETS[dataset_name]
+    path = dataset_path or default_path
+
+    if not filter_expr:
+        full_dataset = _instantiate_dataset(dataset_class, path, data_filter=None)
+        full_loader = DataLoader(full_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+        return full_dataset, None, full_loader, None
+
     held_out_filter = build_filter(dataset_class, filter_expr)
     train_filter = lambda x: ~held_out_filter(x)
 
-    train_dataset = dataset_class(path, data_filter=train_filter)
-    test_dataset = dataset_class(path, data_filter=held_out_filter)
+    train_dataset = _instantiate_dataset(dataset_class, path, data_filter=train_filter)
+    test_dataset = _instantiate_dataset(dataset_class, path, data_filter=held_out_filter)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False)
