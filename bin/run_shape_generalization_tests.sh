@@ -16,7 +16,7 @@ shape_filters["9_shapes"]="1,2,3,4,5,6,7,8,10"
 # List of shape names in the order we want to run them
 shape_names=("1_shape" "4_shapes" "9_shapes")
 
-models=("sa_wwr" "wae")
+models=("wae")
 
 gpu_pool_init "${LOG_DIR}"
 

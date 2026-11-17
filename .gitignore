@@ -5,3 +5,4 @@ plots/
 train.log
 *.log
 pyrightconfig.json
+AGENTS.md

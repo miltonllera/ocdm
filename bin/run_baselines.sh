@@ -8,7 +8,7 @@ MAX_STEPS=${MAX_STEPS:-100000}
 LOG_DIR=${LOG_DIR:-"logs/baseline/launcher"}
 
 datasets=("dsprites" "shapes3d" "pentominos")
-models=("vae" "wae" "sa")
+models=("wae")
 latent_sizes=(16 32 64)
 
 gpu_pool_init "${LOG_DIR}"
