@@ -8,7 +8,7 @@ MAX_STEPS=${MAX_STEPS:-500000}
 LOG_DIR=${LOG_DIR:-"logs/colored/launcher"}
 
 # 1. Colored Pentominos Rotation (shapes 6 and 8, angle >= 180)
-models=("wae" "sa")
+models=("sa")
 LATENT_SIZE=${LATENT_SIZE:-64}
 BATCH_SIZE=${BATCH_SIZE:-256}
 SA_N_ITER=${SA_N_ITER:-3}

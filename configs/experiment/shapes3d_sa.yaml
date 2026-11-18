@@ -48,10 +48,10 @@ model:
     - [conv, [4, 1, 1, 0]]
 
   # Slot Attention parameters
-  n_slots: 4
+  n_slots: 6
   slot_size: 10
   n_iter: 3
-  slot_channels: 1
+  slot_channels: 4
   slot_hidden_size: 128
   approx_implicit_grad: false
   use_wasserstein_reg: false
@@ -65,7 +65,7 @@ training:
     exponential:
       _target_: src.training.scheduler.ExponentialLR
       _partial_: true
-      gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
+      gamma: 0.99999653  # 0.5 ** (1 / 200000)
       decay_groups: null
     warmup:
       _target_: src.training.scheduler.WarmupLR
