@@ -241,6 +241,7 @@ class ColoredMultiShapeDataModule(pl.LightningDataModule):
         filter_fn: Callable | None = None,
         batch_size: int = 64,
         num_workers: int = 4,
+        prevent_overlap: bool = False,
         seed: int | None = 42,
         path: str | None = None,
     ) -> None:
@@ -256,6 +257,7 @@ class ColoredMultiShapeDataModule(pl.LightningDataModule):
         self.filter_fn = filter_fn
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.prevent_overlap = prevent_overlap
         self.seed = seed
         self.dataset_path = path
         self.train_dataset = None
@@ -269,32 +271,40 @@ class ColoredMultiShapeDataModule(pl.LightningDataModule):
         ):
             return
 
-        base_train_dataset = self.dataset(self.dataset_path, "unsupervised", self.held_out_filter)
+        if self.held_out_filter is not None and stage == 'fit':
+            data_filter = lambda *args: ~self.held_out_filter(*args)  # type: ignore
+        else:
+            data_filter = self.held_out_filter
+
+        base_dataset = self.dataset(self.dataset_path, "unsupervised", data_filter)
 
         if stage == "fit":
             self.train_dataset = ColoredMultiShapeDataset(
-                base_train_dataset,
+                base_dataset,
                 n_shapes=self.n_shapes,
                 num_colors=self.num_colors,
                 filter_fn=self.filter_fn,
                 prediction_type='unsupervised',
+                prevent_overlap=self.prevent_overlap,
                 seed=self.seed
             )
             self.val_dataset = ColoredMultiShapeDataset(
-                base_train_dataset,
+                base_dataset,
                 n_shapes=self.n_shapes,
                 num_colors=self.num_colors,
                 filter_fn=self.filter_fn,
                 prediction_type='unsupervised',
+                prevent_overlap=self.prevent_overlap,
                 seed=self.seed + 1 if self.seed is not None else None
             )
         else:
             self.test_dataset = ColoredMultiShapeDataset(
-                base_train_dataset,
+                base_dataset,
                 n_shapes=self.n_shapes,
                 num_colors=self.num_colors,
                 filter_fn=self.filter_fn,
                 prediction_type='unsupervised',
+                prevent_overlap=self.prevent_overlap,
                 seed=self.seed + 2 if self.seed is not None else None
             )
 

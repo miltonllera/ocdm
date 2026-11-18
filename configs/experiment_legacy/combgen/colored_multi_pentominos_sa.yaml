@@ -23,9 +23,7 @@ model:
 
   # Encoder layers configuration
   encoder_config:
-    - [conv, [32, 4, 2, 1]]
-    - [relu]
-    - [conv, [32, 4, 2, 1]]
+    - [conv, [64, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
@@ -35,21 +33,19 @@ model:
     - [posemb2d, {embed: cardinal}]
     - [flatten, [1, 2]]
     - [layer_norm, [-1]]
-    - [linear, [256]]
+    - [linear, [64]]
     - [relu]
 
   # Decoder layers configuration
   decoder_config:
-    - [spatbroad, [4, 4], {input_last: True}]  # Spatial broadcast to 4x4
+    - [spatbroad, [8, 8], {input_last: True}]  # Spatial broadcast to 8x8
     - [posemb2d, {embed: cardinal}]
     - [permute, [0, 3, 1, 2]]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
-    - [tconv, [32, 4, 2, 1]]
+    - [tconv, [64, 4, 2, 1]]
     - [relu]
-    - [tconv, [32, 4, 2, 1]]
-    - [relu]
-    - [tconv, [4, 4, 2, 1]]  # Outputs 3 channels (RGB) + 1 mask channel = 4 channels
+    - [tconv, [4, 4, 2, 1]]
 
   # Slot Attention parameters
   n_slots: 2
@@ -58,7 +54,7 @@ model:
   slot_channels: 4
   slot_hidden_size: 128
   approx_implicit_grad: false
-  use_wasserstein_reg: true
+  use_wasserstein_reg: false
 
 # Training configuration
 training:
