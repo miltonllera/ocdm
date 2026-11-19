@@ -12,6 +12,16 @@ from .sampler import ImbalancedSampler
 
 _logger = logging.getLogger(__name__)
 
+def get_sampler(dataset, rebalance_dim):
+    if rebalance_dim is not None:
+        factors = dataset.factors
+        factor = rebalance_dim
+        cat_idx = [i for i, s in enumerate(factors) if factor in s][0]
+        labels = dataset.factor_values[:,cat_idx]
+        return ImbalancedSampler(labels)
+
+    return None
+
 
 class DisentangledDataModule(pl.LightningDataModule):
     def __init__(
@@ -184,7 +194,7 @@ class CompositionTaskDataModule(pl.LightningDataModule):
             self.test_dataset = dataset
 
     def train_dataloader(self) -> DataLoader:
-        sampler = self.get_sampler(self.train_dataset)
+        sampler = get_sampler(self.train_dataset.dataset, self.rebalance_dim)
         return DataLoader(
             self.train_dataset,
             self.batch_size,
@@ -215,18 +225,6 @@ class CompositionTaskDataModule(pl.LightningDataModule):
     def predict_dataloader(self) -> DataLoader:
         return self.test_dataloader()
 
-    def get_sampler(self, dataset):
-        dataset = dataset.dataset
-
-        if self.rebalance_dim is not None:
-            factors = dataset.factors
-            factor = self.rebalance_dim
-            cat_idx = [i for i, s in enumerate(factors) if factor in s][0]
-            labels = dataset.factor_values[:,cat_idx]
-            return ImbalancedSampler(labels)
-
-        return None
-
 
 class ColoredMultiShapeDataModule(pl.LightningDataModule):
     """
@@ -242,6 +240,7 @@ class ColoredMultiShapeDataModule(pl.LightningDataModule):
         batch_size: int = 64,
         num_workers: int = 4,
         prevent_overlap: bool = False,
+        rebalance_dim: int | str | None = None,
         seed: int | None = 42,
         path: str | None = None,
     ) -> None:
@@ -260,6 +259,7 @@ class ColoredMultiShapeDataModule(pl.LightningDataModule):
         self.prevent_overlap = prevent_overlap
         self.seed = seed
         self.dataset_path = path
+        self.rebalance_dim = rebalance_dim
         self.train_dataset = None
         self.val_dataset = None
         self.test_dataset = None
@@ -309,12 +309,14 @@ class ColoredMultiShapeDataModule(pl.LightningDataModule):
             )
 
     def train_dataloader(self) -> DataLoader:
+        sampler = get_sampler(self.train_dataset.base_dataset, self.rebalance_dim)
         return DataLoader(
             self.train_dataset,  # type: ignore
             self.batch_size,
             num_workers=self.num_workers,
             shuffle=True,
             pin_memory=True,
+            sampler=sampler,
         )
 
     def val_dataloader(self) -> DataLoader:

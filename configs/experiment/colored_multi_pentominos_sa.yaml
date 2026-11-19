@@ -25,31 +25,27 @@ model:
 
   # Encoder layers configuration
   encoder_config:
-    - [conv, [32, 4, 2, 1]]
-    - [relu]
-    - [conv, [32, 4, 2, 1]]
-    - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
-    - [permute, [0, 2, 3, 1]]  # Change to channel-last for position embedding
+    - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [permute, [0, 2, 3, 1]]
     - [posemb2d, {embed: cardinal}]
     - [flatten, [1, 2]]
     - [layer_norm, [-1]]
-    - [linear, [256]]
-    - [relu]
+    - [linear, [64]]
+    - [lrelu]
 
   # Decoder layers configuration
   decoder_config:
-    - [spatbroad, [4, 4], {input_last: True}]  # Spatial broadcast to 4x4
+    - [spatbroad, [8,8], {input_last: True}]  # Spatial broadcast to 4x4
     - [posemb2d, {embed: cardinal}]
     - [permute, [0, 3, 1, 2]]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
-    - [tconv, [32, 4, 2, 1]]
-    - [relu]
-    - [tconv, [32, 4, 2, 1]]
+    - [tconv, [64, 4, 2, 1]]
     - [relu]
     - [tconv, [4, 4, 2, 1]]  # Outputs 3 channels (RGB) + 1 mask channel = 4 channels
 
@@ -66,7 +62,7 @@ model:
 training:
   optimizer:
     _target_: torch.optim.Adam
-    lr: 0.001
+    lr: 0.0003
 
   schedulers:
     exponential:

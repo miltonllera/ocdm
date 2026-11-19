@@ -25,13 +25,13 @@ model:
 
   # Encoder layers configuration
   encoder_config:
-    - [conv, [64, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
+    - [conv, [32, 4, 2, 1]]
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
-    - [permute, [0, 2, 3, 1]]  # Change to channel-last for position embedding
+    - [permute, [0, 2, 3, 1]]
     - [posemb2d, {embed: cardinal}]
     - [flatten, [1, 2]]
     - [layer_norm, [-1]]
@@ -60,19 +60,20 @@ model:
 training:
   optimizer:
     _target_: torch.optim.Adam
-    lr: 0.0003
+    lr: 0.0004
 
   schedulers:
     exponential:
       _target_: src.training.scheduler.ExponentialLR
       _partial_: true
+      # gamma: 0.99999653  # 0.5 ** (1 / 200000)
       gamma: 0.99999653  # 0.5 ** (1 / 200000)
       decay_groups: null
     warmup:
       _target_: src.training.scheduler.WarmupLR
       _partial_: true
       start_value: 0.0
-      warmup_steps: 3000
+      warmup_steps: 30_000
 
   scheduling_metric: val/loss
 

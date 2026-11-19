@@ -90,21 +90,23 @@ class SlotAutoencoder(BaseModel):
         phase: Literal["train", "val", "test"]
     ) -> torch.Tensor:
         inputs, targets = batch
-        # targets = 2 * targets - 1
+        centered_targets = 2 * targets - 1
+        centered_recons, slots, _ = self.forward(inputs)
 
-        recons, slots, _ = self.forward(inputs)
-
-        recons_loss = self.recons_loss(recons, targets) / len(targets)
+        recons_loss = self.recons_loss(centered_recons, centered_targets) / len(targets)
         if is_train := phase == "train" and self.latent_loss_fn is not None:
             latent_loss = self.latent_loss_fn(slots, None)  # type: ignore
         else:
             latent_loss = 0.0
 
+        log = { f"{phase}/loss": recons_loss, f"{phase}/latent_loss": latent_loss }
+
+        if phase != 'train':
+            rescaled_recons = (centered_recons.clamp(-1, 1) + 1.0) / 2.0
+            log[f"{phase}/rescaled_recons"] = self.recons_loss(rescaled_recons, targets)
+
         self.log_dict(
-            {
-                f"{phase}/loss": recons_loss,
-                f"{phase}/latent_loss": latent_loss,
-            },
+            log,
             on_epoch=not is_train,
             on_step=is_train,
             prog_bar=is_train,
@@ -115,7 +117,8 @@ class SlotAutoencoder(BaseModel):
         return recons_loss + latent_loss
 
     def predict(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        return self(inputs)
+        recons, slots, decoder_masks = self(inputs)
+        return (recons + 1.0) / 2.0, slots, decoder_masks
 
     def embed(self, inputs: torch.Tensor) -> torch.Tensor:
         h = self.encoder(inputs)

@@ -38,40 +38,41 @@ model:
 
   # Decoder layers configuration
   decoder_config:
-    - [spatbroad, [16, 16], {input_last: True}]  # Spatial broadcast to 8x8
+    - [spatbroad, [8, 8], {input_last: True}]  # Spatial broadcast to 8x8
     - [posemb2d, {embed: cardinal}]
     - [permute, [0, 3, 1, 2]]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
-    - [conv, [4, 1, 1, 0]]
+    - [tconv, [4, 4, 2, 1]]
 
   # Slot Attention parameters
-  n_slots: 6
+  n_slots: 4
   slot_size: 10
   n_iter: 3
-  slot_channels: 4
+  slot_channels: 1
   slot_hidden_size: 128
-  approx_implicit_grad: false
+  approx_implicit_grad: true
   use_wasserstein_reg: false
 
 training:
   optimizer:
     _target_: torch.optim.Adam
-    lr: 0.0003
+    lr: 0.0004
 
   schedulers:
     exponential:
       _target_: src.training.scheduler.ExponentialLR
       _partial_: true
       gamma: 0.99999653  # 0.5 ** (1 / 200000)
+      # gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
       decay_groups: null
     warmup:
       _target_: src.training.scheduler.WarmupLR
       _partial_: true
       start_value: 0.0
-      warmup_steps: 3_000
+      warmup_steps: 10_000
 
   scheduling_metric: val/loss
 
