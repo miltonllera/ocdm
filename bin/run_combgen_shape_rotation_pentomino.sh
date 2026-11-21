@@ -35,7 +35,7 @@ for s in {1..5}; do
         model_params=("model.latent_size=64")
       else
         base_model="sa"
-        model_params=("model.slot_size=64" "model.use_wasserstein_reg=true")
+        model_params=("model.slot_size=64" )
       fi
 
       filter_expr="np.isin(shape, [${shape_list}]) & (angle >= 180)"

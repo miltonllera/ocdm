@@ -20,7 +20,7 @@ shape_filters["9_shapes"]="1,2,3,4,5,6,7,8,10"
 # List of shape names in the order we want to run them
 shape_names=("1_shape" "4_shapes" "9_shapes")
 
-models=("sa_wwr" "wae")
+models=("sa" "wae")
 
 gpu_pool_init "${LOG_DIR}"
 
@@ -39,7 +39,7 @@ for i in {1..5}; do
         model_params=("model.latent_size=64")
       else
         base_model="sa"
-        model_params=("model.slot_size=64" "model.use_wasserstein_reg=true")
+        model_params=("model.slot_size=64" )
       fi
 
       filter_expr="np.isin(shape, [${shape_list}])"
