@@ -95,7 +95,7 @@ class SlotAutoencoder(BaseModel):
         centered_recons, slots, _ = self.forward(inputs)
 
         recons_loss = self.recons_loss(centered_recons, centered_targets)
-        if is_train := phase == "train" and self.latent_loss_fn is not None:
+        if (is_train := phase == "train") and self.latent_loss_fn is not None:
             latent_loss = self.latent_loss_fn(slots, None)  # type: ignore
         else:
             latent_loss = 0.0
@@ -223,7 +223,7 @@ class FigureGroundAutoencoder(BaseModel):
         recons, fig_rep, _ = self.forward(inputs)
 
         recons_loss = self.recons_loss(recons, targets)
-        if is_train := phase == "train" and self.latent_loss_fn is not None:
+        if (is_train := phase == "train") and self.latent_loss_fn is not None:
             latent_loss = self.latent_loss_fn(fig_rep, None)  # type: ignore
         else:
             latent_loss = 0.0
