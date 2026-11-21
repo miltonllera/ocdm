@@ -16,7 +16,7 @@ dataset:
   batch_size: 256
   num_workers: 4
   path: data/datasets/pentominos/
-
+  prevent_overlap: true
   rebalance_dim: null
 
 model:

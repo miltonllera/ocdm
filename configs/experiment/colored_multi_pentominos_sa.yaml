@@ -17,6 +17,7 @@ dataset:
   num_workers: 12
   path: data/datasets/pentominos/
   rebalance_dim: null
+  prevent_overlap: true
 
 model:
   _target_: src.model.slot.SlotAutoencoder
