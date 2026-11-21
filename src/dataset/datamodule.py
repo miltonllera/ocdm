@@ -239,7 +239,7 @@ class ColoredMultiShapeDataModule(pl.LightningDataModule):
         filter_fn: Callable | None = None,
         batch_size: int = 64,
         num_workers: int = 4,
-        prevent_overlap: bool = False,
+        prevent_overlap: bool = True,
         rebalance_dim: int | str | None = None,
         seed: int | None = 42,
         path: str | None = None,

@@ -16,7 +16,6 @@ dataset:
   batch_size: 64
   num_workers: 4
   path: data/datasets/pentominos/
-
   rebalance_dim: null
 
 model:
