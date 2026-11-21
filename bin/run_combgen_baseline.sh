@@ -8,7 +8,7 @@ MAX_STEPS=${MAX_STEPS:-500000}
 LOG_DIR=${LOG_DIR:-"logs/combgen/launcher"}
 
 models=("sa")
-latent_sizes=(64)
+latent_sizes=(16 32 64)
 
 gpu_pool_init "${LOG_DIR}"
 
@@ -65,6 +65,6 @@ run_benchmark "shapes3d" "combgen_shapes3d_shape_hue" "( shape == 3 ) & ( object
 # run_benchmark "dsprites" "combgen_dsprites_heart_rotation" "( shape == 3 ) & ( orientation < np.pi )"
 
 # 4. LiLS Replication: 3DShapes shape & hue
-# run_benchmark "shapes3d" "combgen_shapes3d_shape_scale" "( shape == 3 ) & ( scale > 1.0 )"
+run_benchmark "shapes3d" "combgen_shapes3d_shape_scale" "( shape == 3 ) & ( scale > 1.0 )"
 
 gpu_pool_wait
