@@ -106,7 +106,7 @@ class VariationalAutoencoder(BaseModel):
         return loss if is_train else recons_loss
 
     def predict(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        return self.forward(inputs)[1]
+        return self.forward(inputs)
 
     def reconstruction(self, inputs: torch.Tensor):
         return self.forward(inputs)[0]
@@ -139,6 +139,10 @@ class BetaVAE(VariationalAutoencoder):
         if isinstance(self.latent_loss_fn, UpdatableLoss):
             self.latent_loss_fn.update_parameters(self.global_step)
 
+    def predict(self, inputs: torch.Tensor):
+        recons, z, params =  super().predict(inputs)
+        return  recons.sigmoid_(), z, params
+
     def reconstruction(self, inputs: torch.Tensor):
         return super().reconstruction(inputs).sigmoid_()
 
@@ -154,23 +158,12 @@ class WassersteinAE(VariationalAutoencoder):
         training: TrainingInit,
         latent_size: int = 10,
         use_discrete: bool = True,
-        lambda1: float = 10.0,
-        lambda2: float = 0.0,
-        prior_var: float = 1.0,
-        lmbda_schedule: tuple[int, float] | None = None,
-        discriminator: nn.Module | None = None,
-        optimizer_fn: Callable | None = None,
+        *,
+        latent_loss_fn: WassersteinAdversarial | WassersteinMMD
     ):
         super().__init__(input_size, encoder_config, decoder_config, training, latent_size, "mse")
         self.use_discrete = use_discrete
-        self.latent_loss_fn = WassersteinAdversarial(
-            lambda1=lambda1,
-            lambda2=lambda2,
-            prior_var=prior_var,
-            lmbda_schedule=lmbda_schedule,
-            discriminator=discriminator,
-            optimizer=optimizer_fn
-        )
+        self.latent_loss_fn = latent_loss_fn
 
     def _compute_latent_loss(
             self,
@@ -197,8 +190,60 @@ class WassersteinAE(VariationalAutoencoder):
             self.latent_loss_fn.eval()
         return result
 
+    def _step(
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+        phase: Literal["train", "val", "test"]
+    ) -> torch.Tensor:
+        inputs, targets = batch
+        targets = 2.0 * targets + 1.0
+        return super()._step((inputs, targets), batch_idx, phase)
 
-class WassersteinMMDAE(VariationalAutoencoder):
+    def reconstruction(self, inputs: torch.Tensor):
+        return (super().reconstruction(inputs).clip(-1.0, 1.0) + 1.0) / 2.0
+
+    def predict(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        recons, z, params = self.forward(inputs)
+        return (recons.clip(-1.0, 1.0) + 1.0) / 2.0, z, params
+
+
+class WassersteinAdvAE(WassersteinAE):
+    def __init__(
+        self,
+        input_size: tuple[int, int, int] | int,
+        encoder_config: list,
+        decoder_config: list,
+        training: TrainingInit,
+        latent_size: int = 10,
+        use_discrete: bool = True,
+        lambda1: float = 10.0,
+        lambda2: float = 0.0,
+        prior_var: float = 1.0,
+        lmbda_schedule: tuple[int, float] | None = None,
+        discriminator: nn.Module | None = None,
+        optimizer_fn: Callable | None = None,
+    ):
+        latent_loss_fn = WassersteinAdversarial(
+            lambda1=lambda1,
+            lambda2=lambda2,
+            prior_var=prior_var,
+            lmbda_schedule=lmbda_schedule,
+            discriminator=discriminator,
+            optimizer=optimizer_fn
+        )
+
+        super().__init__(
+            input_size,
+            encoder_config,
+            decoder_config,
+            training,
+            latent_size,
+            latent_loss_fn=latent_loss_fn
+        )
+
+
+class WassersteinMMDAE(WassersteinAE):
     """Wasserstein Autoencoder using Maximum Mean Discrepancy."""
 
     def __init__(
@@ -216,9 +261,7 @@ class WassersteinMMDAE(VariationalAutoencoder):
         kernel: Callable | None = None,
         lambda_schedule: tuple[int, float] | None = None,
     ):
-        super().__init__(input_size, encoder_config, decoder_config, training, latent_size, "mse")
-        self.use_discrete = use_discrete
-        self.latent_loss_fn = WassersteinMMD(
+        latent_loss_fn = WassersteinMMD(
             lambda1=lambda1,
             lambda2=lambda2,
             prior_type=prior_type,
@@ -226,16 +269,11 @@ class WassersteinMMDAE(VariationalAutoencoder):
             kernel=kernel,
             lambda_schedule=lambda_schedule
         )
-
-    def _compute_latent_loss(
-        self,
-        z: torch.Tensor,
-        z_params: tuple[torch.Tensor, torch.Tensor]
-    ) -> torch.Tensor:
-        if self.use_discrete:
-            z = z_params[0]
-        return self.latent_loss_fn(z, z_params)
-
-    def on_train_batch_end(self, outputs, batch, batch_idx):
-        if isinstance(self.latent_loss_fn, UpdatableLoss):
-            self.latent_loss_fn.update_parameters(self.global_step)
+        super().__init__(
+            input_size,
+            encoder_config,
+            decoder_config,
+            training,
+            latent_size,
+            latent_loss_fn=latent_loss_fn
+        )
