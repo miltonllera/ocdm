@@ -12,7 +12,7 @@ from src.nn.discriminator import PatchDiscriminator
 from src.nn.utils.parsing import create_sequential
 from src.training.loss import (
     DiscriminatorLoss,
-    ReconstructionLoss,
+    get_recons_loss,
 )
 from .base import BaseModel, TrainingInit
 
@@ -54,7 +54,7 @@ class DiscreteAutoencoder(BaseModel):
 
         decoder_input_size = token_dim, H, W
         self.patch_decoder = create_sequential(decoder_input_size, decoder_config)
-        self.recons_loss = ReconstructionLoss()
+        self.recons_loss = get_recons_loss("mse")
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -157,7 +157,7 @@ class VectorQuantizedAutoencoder(BaseModel):
         decoder_input_size = token_dim, H, W
         self.patch_decoder = create_sequential(decoder_input_size, decoder_config)
 
-        self.recons_loss = ReconstructionLoss()
+        self.recons_loss = get_recons_loss("mse")
         self.reset_parameters()
 
     def reset_parameters(self):

@@ -8,6 +8,7 @@ from src.nn.slot import SlotAttention, FigureGroundSegmentation
 from src.nn.spatial import PositionEmbedding2D
 from src.training.loss import WassersteinMMD
 from src.nn.utils.parsing import create_sequential
+from src.training.loss import get_recons_loss
 
 
 class SlotAutoencoder(BaseModel):
@@ -49,7 +50,7 @@ class SlotAutoencoder(BaseModel):
         )
 
         self.decoder = create_sequential(slot_size, decoder_config)
-        self.recons_loss = nn.MSELoss(reduction='sum')
+        self.recons_loss = get_recons_loss("mse")
         if use_wasserstein_reg:
             self.latent_loss_fn = WassersteinMMD(
                 lambda1=10.0,
@@ -93,7 +94,7 @@ class SlotAutoencoder(BaseModel):
         centered_targets = 2 * targets - 1
         centered_recons, slots, _ = self.forward(inputs)
 
-        recons_loss = self.recons_loss(centered_recons, centered_targets) / len(targets)
+        recons_loss = self.recons_loss(centered_recons, centered_targets)
         if is_train := phase == "train" and self.latent_loss_fn is not None:
             latent_loss = self.latent_loss_fn(slots, None)  # type: ignore
         else:
@@ -168,7 +169,7 @@ class FigureGroundAutoencoder(BaseModel):
         )
 
         self.decoder = create_sequential(slot_size, decoder_config)
-        self.recons_loss = nn.MSELoss(reduction='sum')
+        self.recons_loss = get_recons_loss("mse")
 
         if use_wasserstein_reg:
             self.latent_loss_fn = WassersteinMMD(
@@ -221,7 +222,7 @@ class FigureGroundAutoencoder(BaseModel):
         inputs, targets = batch
         recons, fig_rep, _ = self.forward(inputs)
 
-        recons_loss = self.recons_loss(recons, targets) / len(targets)
+        recons_loss = self.recons_loss(recons, targets)
         if is_train := phase == "train" and self.latent_loss_fn is not None:
             latent_loss = self.latent_loss_fn(fig_rep, None)  # type: ignore
         else:

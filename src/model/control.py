@@ -1,12 +1,12 @@
 from typing import Literal
 
 import torch
-import torch.nn as nn
 
 from src.model.base import BaseModel, TrainingInit
 from src.nn.slot import SlotAttention, FigureGroundSegmentation
 from src.nn.stochastic import DiagonalGaussian
 from src.nn.utils.parsing import create_sequential
+from src.training.loss import get_recons_loss
 
 
 class SlotDecoderControl(BaseModel):
@@ -45,7 +45,7 @@ class SlotDecoderControl(BaseModel):
 
         decoder_input_size = n_slots * slot_size
         self.decoder = create_sequential(decoder_input_size, decoder_config)
-        self.recons_loss = nn.MSELoss(reduction='sum')
+        self.recons_loss = get_recons_loss("mse")
 
     def forward(
         self,
@@ -109,7 +109,7 @@ class SlotAttentionControl(BaseModel):
         latent_size = n_slots * slot_size
         self.latent = DiagonalGaussian(encoder_output_size, latent_size)
         self.decoder = create_sequential(slot_size, decoder_config)
-        self.recons_loss = nn.MSELoss(reduction='sum')
+        self.recons_loss = get_recons_loss("mse")
         self.beta = beta
 
     def decode(self, slots: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -209,7 +209,7 @@ class FigureGroundDecoderControl(BaseModel):
         )
 
         self.decoder = create_sequential(slot_size, decoder_config)
-        self.recons_loss = nn.MSELoss(reduction='sum')
+        self.recons_loss = get_recons_loss("mse")
 
     def forward(
             self,
@@ -227,7 +227,6 @@ class FigureGroundDecoderControl(BaseModel):
         phase: Literal["train", "val", "test"]
     ):
         inputs, targets = batch
-        targets = 2 * targets - 1
 
         recons, (_, _) = self.forward(inputs)
 
@@ -255,8 +254,7 @@ class FigureGroundDecoderControl(BaseModel):
         return fig_reps
 
     def reconstruction(self, inputs):
-        output = (self.predict(inputs)[0] + 1) / 2
-        return output.clip(0, 1)
+        return self.predict(inputs)[0].clip(0, 1)
 
 
 class FigureGroundControl(BaseModel):
@@ -283,7 +281,7 @@ class FigureGroundControl(BaseModel):
 
         self.latent = DiagonalGaussian(encoder_output_size, latent_size)
         self.decoder = create_sequential(latent_size, decoder_config)
-        self.recons_loss = nn.MSELoss(reduction='sum')
+        self.recons_loss = get_recons_loss("mse")
         self.beta = beta
 
     def decode(self, fig_rep: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -309,7 +307,6 @@ class FigureGroundControl(BaseModel):
         phase: Literal["train", "val", "test"]
     ):
         inputs, targets = batch
-        targets = 2 * targets - 1
 
         (recons, _), (_, params) = self.forward(inputs)
 
@@ -347,5 +344,4 @@ class FigureGroundControl(BaseModel):
         return z.unsqueeze(1)
 
     def reconstruction(self, inputs):
-        output = (self.predict(inputs)[0][0] + 1) / 2
-        return output.clip(0, 1)
+        return self.predict(inputs)[0][0].clip(0, 1)

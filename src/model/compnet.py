@@ -5,7 +5,7 @@ from typing import Literal
 from src.nn.composition import FixedInterpolationComp
 from src.nn.stochastic import DiagonalGaussian
 from src.nn.utils.parsing import create_sequential
-from src.training.loss import GaussianKL
+from src.training.loss import GaussianKL, get_recons_loss
 
 from .base import BaseModel, TrainingInit
 
@@ -47,7 +47,7 @@ class CompositionNet(BaseModel):
         self.decoder = create_sequential(latent_size, decoder_config)
 
         # Fixed losses
-        self.recons_loss = nn.MSELoss(reduce='sum')
+        self.recons_loss = get_recons_loss("mse")
         self.latent_loss_fn = GaussianKL(beta=beta)
 
     @property
@@ -77,7 +77,7 @@ class CompositionNet(BaseModel):
 
         recons, z, params = self.forward(inputs)
 
-        recons_loss = self.recons_loss(recons, targets) / len(inputs)
+        recons_loss = self.recons_loss(recons, targets)
         latent_loss = self.latent_loss_fn(z, params)
         loss = recons_loss + latent_loss
 

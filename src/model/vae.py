@@ -8,7 +8,7 @@ from src.nn.init import weights_init
 from src.nn.stochastic import DiagonalGaussian
 from src.nn.utils.parsing import create_sequential
 from src.training.loss import (
-    ReconstructionLoss,
+    get_recons_loss,
     UpdatableLoss,
     GaussianKL,
     WassersteinAdversarial,
@@ -44,7 +44,7 @@ class VariationalAutoencoder(BaseModel):
 
         self.latent = DiagonalGaussian(encoder_output_size, latent_size)
         self.decoder = create_sequential(latent_size, decoder_config)
-        self.recons_loss = ReconstructionLoss(recons_loss)
+        self.recons_loss = get_recons_loss(recons_loss)
 
         self.reset_parameters()
 
@@ -197,7 +197,7 @@ class WassersteinAE(VariationalAutoencoder):
         phase: Literal["train", "val", "test"]
     ) -> torch.Tensor:
         inputs, targets = batch
-        targets = 2.0 * targets + 1.0
+        targets = 2.0 * targets - 1.0
         return super()._step((inputs, targets), batch_idx, phase)
 
     def reconstruction(self, inputs: torch.Tensor):

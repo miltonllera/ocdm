@@ -39,31 +39,20 @@ class UpdatableLoss:
         raise NotImplementedError
 
 
-class ReconstructionLoss(Loss):
-    def __init__(
-        self,
-        loss: Literal["bce", "mse", "l1"] = "mse",
-    ):
-        super().__init__()
+def get_recons_loss(loss: Literal["bce", "mse", "l1"] = "mse"):
+    if loss == "bce":
+        loss_fn = logits_bce
+    elif loss == "mse":
+        loss_fn = mse_loss
+    elif loss == "l1":
+        loss_fn = l1_loss
+    else:
+        raise ValueError(f"Unrecognized loss function {loss}")
 
-        if loss == "bce":
-            loss_fn = logits_bce
-        elif loss == "mse":
-            loss_fn = mse_loss
-        elif loss == "l1":
-            loss_fn = l1_loss
-        else:
-            raise ValueError(f"Unrecognized loss function {loss}")
+    def _wrapper(x: torch.Tensor, y: torch.Tensor):
+        return loss_fn(x, y, reduction="sum") / y.size(0)
 
-        self.loss_fn = loss_fn
-
-    def forward(self, input, target):
-        if isinstance(input, (tuple, list)):
-            recons = input[0]
-        else:
-            recons = input
-
-        return self.loss_fn(recons, target, reduction="sum") / target.size(0)
+    return _wrapper
 
 
 class GaussianKL(Loss, UpdatableLoss):
