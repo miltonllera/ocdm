@@ -4,7 +4,7 @@ source "$(dirname "$0")/gpu_queue.sh"
 
 # Default GPU device and settings
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
-MAX_STEPS=${MAX_STEPS:-500000}
+MAX_STEPS=${MAX_STEPS:-200000}
 LOG_DIR=${LOG_DIR:-"logs/shape_extrapolation/launcher"}
 
 # Define the shape configurations (nested sets)

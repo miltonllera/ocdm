@@ -4,7 +4,7 @@ source "$(dirname "$0")/gpu_queue.sh"
 
 # Configuration and defaults
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
-MAX_STEPS=${MAX_STEPS:-500000}
+MAX_STEPS=${MAX_STEPS:-200000}
 LOG_DIR=${LOG_DIR:-"logs/colored/launcher"}
 
 # 1. Colored Pentominos Rotation (shapes 6 and 8, angle >= 180)

@@ -13,8 +13,8 @@ dataset:
   num_colors: 10
   held_out_filter: null
   filter_fn: null
-  batch_size: 64
-  num_workers: 4
+  batch_size: 256
+  num_workers: 12
   path: data/datasets/pentominos/
   rebalance_dim: null
 
@@ -67,8 +67,7 @@ training:
     exponential:
       _target_: src.training.scheduler.ExponentialLR
       _partial_: true
-      # gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
-      gamma: 0.99999653  # 0.5 ** (1 / 200000)
+      gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
       decay_groups: null
     warmup:
       _target_: src.training.scheduler.WarmupLR
@@ -81,7 +80,7 @@ training:
 
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_steps: 100_000
+  max_steps: 200_000
   gradient_clip_val: 1.0
   accelerator: auto
   devices: auto

@@ -13,10 +13,9 @@ dataset:
   held_out_filter: null
   rebalance_dim: null
   val_split: 0.2
-  batch_size: 128
-
+  batch_size: 256
   # Performance stuff
-  num_workers: 4
+  num_workers: 12
 
 
 model:
@@ -75,7 +74,7 @@ training:
 
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_steps: 100_000
+  max_steps: 200_000
   gradient_clip_val: 1.0
   accelerator: auto
   devices: auto

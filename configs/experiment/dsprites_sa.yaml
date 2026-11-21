@@ -9,7 +9,7 @@ test: true
 dataset:
   _target_: src.dataset.dsprites.DSprites
   path: data/datasets/dsprites/dsprites_train.hdf5
-  batch_size: 64
+  batch_size: 256
   held_out_filter: null
   # Performance stuff
   num_workers: 4
@@ -59,14 +59,13 @@ model:
 training:
   optimizer:
     _target_: torch.optim.Adam
-    lr: 0.0003
+    lr: 0.0004
 
   schedulers:
     exponential:
       _target_: src.training.scheduler.ExponentialLR
       _partial_: true
-      gamma: 0.99999653  # 0.5 ** (1 / 200000)
-      # gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
+      gamma: 0.999993068552217  # 0.5 ** (1 / 100000)
       decay_groups: null
     warmup:
       _target_: src.training.scheduler.WarmupLR
@@ -79,7 +78,7 @@ training:
 
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_steps: 100_000
+  max_steps: 200_000
   gradient_clip_val: 1.0
   accelerator: auto
   devices: auto

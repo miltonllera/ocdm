@@ -9,7 +9,7 @@ test: true
 dataset:
   _target_: src.dataset.dsprites.DSprites
   path: data/datasets/dsprites/dsprites_train.hdf5
-  batch_size: 64
+  batch_size: 256
   held_out_filter: null
   rebalance_dim: null
   num_workers: 4
@@ -65,14 +65,14 @@ training:
     warmup:
       _target_: torch.optim.lr_scheduler.LinearLR
       start_factor: 0.1
-      total_iters: 1000
+      total_iters: 10_000
 
   scheduling_metric: val/loss
 
 
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_steps: 100_000
+  max_steps: 200_000
   gradient_clip_val: 1.0
   accelerator: auto
   devices: auto

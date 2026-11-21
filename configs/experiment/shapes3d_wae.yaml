@@ -9,6 +9,7 @@ test: true
 dataset:
   _target_: src.dataset.shapes3d.Shapes3D
   path: data/datasets/shapes3d/3dshapes.h5
+  batch_size: 256
   held_out_filter: null
   # color_format: rgb
   # Performance stuff
@@ -66,14 +67,14 @@ training:
     warmup:
       _target_: torch.optim.lr_scheduler.LinearLR
       start_factor: 0.1
-      total_iters: 1000
+      total_iters: 10_000
 
   scheduling_metric: val/loss
 
 
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_steps: 100_000
+  max_steps: 200_000
   gradient_clip_val: 1.0
   accelerator: auto
   devices: auto

@@ -4,7 +4,7 @@ source "$(dirname "$0")/gpu_queue.sh"
 
 # Configuration and defaults
 FAST_DEV_RUN=${FAST_DEV_RUN:-false}
-MAX_STEPS=${MAX_STEPS:-500000}
+MAX_STEPS=${MAX_STEPS:-200000}
 LATENT_SIZE=${LATENT_SIZE:-64}
 BATCH_SIZE=${BATCH_SIZE:-256}
 SA_N_ITER=${SA_N_ITER:-3}
