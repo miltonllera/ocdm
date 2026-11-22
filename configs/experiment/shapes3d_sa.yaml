@@ -24,11 +24,11 @@ model:
 
   # Encoder layers configuration
   encoder_config:
-    - [conv, [64, 4, 2, 1]]  # 32 channels, kernel 4x4, stride 2, padding 1
-    - [relu]
     - [conv, [64, 4, 2, 1]]
     - [relu]
     - [conv, [64, 4, 2, 1]]
+    - [relu]
+    - [conv, [64, 1, 1, 0]]
     - [relu]
     - [permute, [0, 2, 3, 1]]  # Change to channel-last for position embedding
     - [posemb2d, {embed: cardinal}]
@@ -39,10 +39,10 @@ model:
 
   # Decoder layers configuration
   decoder_config:
-    - [spatbroad, [8, 8], {input_last: True}]  # Spatial broadcast to 8x8
-    - [posemb2d, {embed: cardinal}]
+    - [spatbroad, [16, 16], {input_last: True}]
+    - [posemb2d, {embed: sine}]
     - [permute, [0, 3, 1, 2]]
-    - [tconv, [64, 4, 2, 1]]
+    - [tconv, [64, 1, 1, 0]]
     - [relu]
     - [tconv, [64, 4, 2, 1]]
     - [relu]
@@ -55,7 +55,7 @@ model:
   slot_channels: 1
   slot_hidden_size: 128
   approx_implicit_grad: true
-  use_wasserstein_reg: false
+  use_wasserstein_reg: true
 
 training:
   optimizer:

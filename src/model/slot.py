@@ -173,7 +173,7 @@ class FigureGroundAutoencoder(BaseModel):
 
         if use_wasserstein_reg:
             self.latent_loss_fn = WassersteinMMD(
-                lambda1=10.0,
+                lambda1=100.0,
                 lambda2=0.0,  # No z_param variance regularization
                 prior_type='norm',
                 prior_var=2.0,
