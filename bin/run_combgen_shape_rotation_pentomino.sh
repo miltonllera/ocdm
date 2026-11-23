@@ -9,18 +9,19 @@ LOG_DIR=${LOG_DIR:-"logs/pentominos_rotation/launcher"}
 
 # Define the shape configurations (nested sets)
 declare -A shape_filters
-shape_filters["1_shape"]="8"
-shape_filters["4_shapes"]="4,5,6,8"
-shape_filters["9_shapes"]="1,2,3,4,5,6,7,8,10"
+shape_filters["2_shape"]="2,8"
+shape_filters["5_shapes"]="2,4,5,6,8"
+shape_filters["8_shapes"]="1,2,3,4,5,6,7,8"
 
 # List of shape names in the order we want to run them
-shape_names=("1_shape" "4_shapes" "9_shapes")
+# shape_names=("2_shape" "5_shapes" "8_shapes")
+shape_names=("2_shape" )
 
-models=("sa")
+models=("wae" "sa")
 
 gpu_pool_init "${LOG_DIR}"
 
-for s in {1..5}; do
+for s in {1..1}; do
   for model in "${models[@]}"; do
     for shape_name in "${shape_names[@]}"; do
     shape_list="${shape_filters[$shape_name]}"
