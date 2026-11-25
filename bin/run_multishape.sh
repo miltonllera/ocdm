@@ -11,7 +11,7 @@ SA_N_ITER=${SA_N_ITER:-3}
 LOG_DIR=${LOG_DIR:-"logs/multi_shape/launcher"}
 
 multi_models=("wae" "sa")
-multi_filter="((shape == 6) | (shape == 8)) & (angle >= 180)"
+multi_filter="((shape == 2) | (shape == 8)) & (angle >= 180)"
 
 echo "========================================================================="
 echo "Running Colored Multi-Shape Pentominos Suite"

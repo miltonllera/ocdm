@@ -14,10 +14,10 @@ dataset:
   held_out_filter: null
   filter_fn: null
   batch_size: 256
+  prevent_overlap: true
   num_workers: 12
   path: data/datasets/pentominos/
   rebalance_dim: null
-  prevent_overlap: true
 
 model:
   _target_: src.model.slot.SlotAutoencoder
