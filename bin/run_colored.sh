@@ -8,11 +8,11 @@ MAX_STEPS=${MAX_STEPS:-200000}
 LOG_DIR=${LOG_DIR:-"logs/colored/launcher"}
 
 # 1. Colored Pentominos Rotation (shapes 6 and 8, angle >= 180)
-models=("sa")
+models=("wae" "sa")
 LATENT_SIZE=${LATENT_SIZE:-64}
 BATCH_SIZE=${BATCH_SIZE:-256}
 SA_N_ITER=${SA_N_ITER:-3}
-filter_expr="((shape == 6) | (shape == 8)) & (angle >= 180)"
+filter_expr="((shape == 2) | (shape == 8)) & (angle >= 180)"
 
 echo "========================================================================="
 echo "Running Colored Pentominos Rotation Suite"
